@@ -69,7 +69,13 @@ stop("done")
 if(TRUE){
   print("Making files for each meter")
   setmeters <- allmeters
-  mclapply(setmeters, function(idmeter){
+  
+  setmeters <- allmeters[6685:length(allmeters)]
+  
+  res <- lapply(setmeters, function(idmeter){
+    
+    if(idmeter%%100 == 0)
+    print(idmeter)
     
     infoMeter <- infoDT %>% filter(IDMETER == idmeter) %>% select(firstAdvance, lastAdvance) 
     firstAdvance <- infoMeter %>% .$firstAdvance
@@ -87,6 +93,7 @@ if(TRUE){
     
     datetime <- select(meterdata, ADVANCEDATETIME) %>% .$ADVANCEDATETIME
     index <- match(datetime, alldates)
+    stopifnot(all(!is.na(index)))
     
     dataset[index, c("ELECKWH")] <- select(meterdata, ELECKWH)
     
@@ -100,7 +107,7 @@ if(TRUE){
     
     stopifnot(nrow(dataset) > 0)
     save(file = file.path(initmeters.folder, paste("meter-", idmeter, ".Rdata", sep = "")) , list = c("dataset"))
-  }, mc.cores = 10)
+  })
 }
 
 
