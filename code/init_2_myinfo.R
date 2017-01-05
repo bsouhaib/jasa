@@ -11,20 +11,10 @@ makelist <- function(vecintervals){
   mylist <- lapply(sol, "[[", 1)
 }
 
-missingPerDay <- function(meterseries){
-  mymat <- matrix(meterseries, ncol = 48, byrow = T)
-  ndays <- nrow(mymat)
-  vec <- apply(t(apply(mymat, 1, is.na)), 1, sum)
-  sort(vec[which(vec != 0)])
-}
-
-
 load(file.path(work.folder, "info.Rdata"))
 
 # "UKG" "UKL" "UKJ" "UKI" "UKM" "UKF" "---" "UKK" "UKD"
 myregion <- "UKF"
-#myregion <- "UKG"
-#myregion <- "UKJ"
 
 subInfoDT <- infoDT %>%
   filter(NUTS1 %in% myregion)
@@ -67,8 +57,6 @@ for(i in seq_along(metersInInterval)){
 id <- which(pctFound > 0.99)
 finalmeters <- metersInInterval[id]
 
-
-
 # Keep meters with few missing values
 x <- subInfoDT %>% filter(IDMETER %in% finalmeters)
 
@@ -110,40 +98,36 @@ x <- x %>% filter(DEMO2 != "D517", DEMO1 != "D2")
 
 # Save myinfo.Rdata
 myinfoDT <- x
-mymeters <- x %>% .$IDMETER
+bottomSeries <- myinfoDT %>% .$IDMETER
+n_bottom <- length(bottomSeries)
 
+myedges <- data.frame(rbind(cbind(myinfoDT$NUTS1,myinfoDT$NUTS2), 
+                            cbind(myinfoDT$NUTS2, myinfoDT$NUTS3), 
+                            cbind(myinfoDT$NUTS3, myinfoDT$NUTS4), 
+                            cbind(myinfoDT$NUTS4, myinfoDT$IDMETER)))
+itree <- graph.data.frame(myedges)
+itree <- simplify(itree, remove.loops = F)
+# plot(itree, layout = layout.reingold.tilford(itree, root=1, circular=T), vertex.label.cex = 0.4, vertex.size = 1, vertex.label.dist = .2)
+# MUCH BETTER: plot(itree, layout = layout.reingold.tilford(itree, root=1, circular=T), vertex.size=0, vertex.label=NA, edge.arrow.size=0)
 
-# save(file = file.path(working.folder, "myinfo.Rdata") , list = c("myinfoDT", "mymeters"))
+# Compute Sagg - for each agg. node, compute the associated leafs
+all.nodes.names <- V(itree)$name
+agg.nodes.names <- aggSeries <- all.nodes.names[which(degree(itree, V(itree), "out")!=0)]
+n_agg <- length(agg.nodes.names)
+Sagg <- matrix(0, nrow = n_agg, ncol = n_bottom)
 
-stop("done")
-############################
-pdf(paste("NUTS-", myregion, ".pdf", sep= ""))
-#myDT <- dplyr::filter(subInfoDT, IDMETER %in% finalmeters)
-myDT <- x
-c <- data.frame(rbind(cbind(myregion,myDT$NUTS2), cbind(myDT$NUTS2, myDT$NUTS3), cbind(myDT$NUTS3, myDT$NUTS4) ))
-g <- graph.data.frame(c)
-g <- simplify(g, remove.loops = F)
-plot(g, layout = layout.reingold.tilford(g, root=1, circular=T), vertex.label.cex = 0.4, vertex.size = 1, vertex.label.dist = .2)
-dev.off()
+for(i in seq_along(agg.nodes.names)){
+  agg.node.name <- agg.nodes.names[i]
+  reachable <- which(shortest.paths(itree, agg.node.name, mode="out") != Inf)
+  terminal.nodes <- reachable[which(degree(itree, reachable, mode="out") == 0)]
+  #print(terminal.nodes)
+  terminal.nodes.names <- all.nodes.names[terminal.nodes]
+  #myinfoDT %>% filter(IDMETER %in% all.nodes.names[terminal.nodes]) %>% select(NUTS4)
+  ids <- match(terminal.nodes.names, bottomSeries)
+  stopifnot(all(!is.na(ids)))
+  Sagg[i, ids] <- 1
+}
 
-#print(dim(subInfoDT %>% filter(IDMETER %in% finalmeters)))
-#print(as.data.frame(subInfoDT %>% filter(IDMETER %in% finalmeters) %>% count(NUTS1, NUTS4) %>% arrange(n)))
-
-print(dim(x))
-print(as.data.frame(x %>% count(NUTS1, NUTS4) %>% arrange(n)))
-
-
-pdf(paste("DEMO-", myregion, ".pdf", sep= ""))
-c <- data.frame(rbind(cbind("DEMO",myDT$DEMO1), cbind(myDT$DEMO1, myDT$DEMO2), cbind(myDT$DEMO2, myDT$DEMO3) ))
-g <- graph.data.frame(c)
-g <- simplify(g, remove.loops = F)
-plot(g, layout = layout.reingold.tilford(g, root=1, circular=T), vertex.label.cex = 0.4, vertex.size = 1, vertex.label.dist = .2)
-dev.off()
-#print(as.data.frame(subInfoDT %>% filter(IDMETER %in% finalmeters) %>% count(DEMO1, DEMO3) %>% arrange(n)))
-
-#print(as.data.frame(x %>% count(DEMO1, DEMO3) %>% arrange(n)))
-
-
-# scp -i "bsouhaib-key-pair-sydney.pem" ubuntu@ec2-13-54-209-237.ap-southeast-2.compute.amazonaws.com:/home/rstudio/codemeters/code/Rplots.pdf .
+save(file = file.path(work.folder, "myinfo.Rdata") , list = c("myinfoDT", "bottomSeries", "itree", "Sagg", "aggSeries", "n_agg", "n_bottom"))
 
 
