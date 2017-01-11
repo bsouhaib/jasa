@@ -10,3 +10,5 @@ mymeters.folder   <- file.path(procdata.folder , "mymeters")
 aggseries.folder   <- file.path(procdata.folder , "aggseries")
 
 basef.folder  <- file.path(work.folder , "basef")
+results.folder <- file.path(work.folder , "pdfs")
+loss.folder <- file.path(work.folder , "loss")

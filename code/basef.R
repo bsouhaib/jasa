@@ -2,12 +2,12 @@ rm(list = ls())
 print(base::date())
 args = (commandArgs(TRUE))
 if(length(args) == 0){
-  hierarchy <- "geo"
-  ncores <- 2
+  #hierarchy <- "geo"
+  #ncores <- 2
   algo <- c("TBATS")
 
   do.agg <- TRUE
-  alliseries <- 1:10
+  alliseries <- 1
   
 }else{
   
@@ -15,12 +15,12 @@ if(length(args) == 0){
     print(args[[i]])
   }
   
-  hierarchy <- args[[1]]
-  ncores <- as.numeric(args[[2]])
-  algo <- args[[3]]
-  do.agg <- as.logical(args[[4]])
+  #hierarchy <- args[[1]]
+  #ncores <- as.numeric(args[[1]])
+  algo <- args[[1]]
+  do.agg <- as.logical(args[[2]])
   alliseries <- NULL
-  for(i in seq(5, length(args))){
+  for(i in seq(3, length(args))){
     alliseries <- c(alliseries, as.numeric(args[[i]]))
   }
 
@@ -39,6 +39,7 @@ source("config_general.R")
 source("config_splitting.R")
 source("jasa_utils.R")
 
+library(parallel)
 library(fBasics)
 library(msm)
 library(gtools)
@@ -49,8 +50,10 @@ load(file.path(work.folder, "myinfo.Rdata"))
 algos_allowed <- c("Uncond", "KD-IC-TRC", "KD-IC-NML", "TBATS", "BATS")
 stopifnot(algo %in% algos_allowed)
 
+#res <- mclapply(alliseries, function(iseries){
+#res <- mclapply(seq(2), function(iseries){
 for(iseries in alliseries){
-  
+
   print(iseries)
   if(do.agg){
     idseries <- aggSeries[iseries]
@@ -59,6 +62,11 @@ for(iseries in alliseries){
     idseries <- bottomSeries[iseries]
     load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
   }
+  
+  #if(iseries == 4)
+  #{
+  #  demand <- demand + jitter(demand, amount = 0)
+  #}
   
   do.scaling <- FALSE
   if(do.scaling){
@@ -75,6 +83,7 @@ for(iseries in alliseries){
   print(algo)
   res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
   dir.create(file.path(basef.folder, algo), showWarnings = FALSE)
+ 
   
   if(algo == "Uncond"){
     qFlearn <- quantile(demand[learn$id], alphas)
@@ -97,7 +106,7 @@ for(iseries in alliseries){
       mykernel <- "normal"
     }
     
-    
+    #print(mykernel)
     ### LEARNING
     res_learning <- predictkde("learning")
     
@@ -112,6 +121,7 @@ for(iseries in alliseries){
     avg_crps_nighthours <- apply(crps_nighthours, 1, mean)
     id_best_nighthours <- which.min(avg_crps_nighthours)
     bandwiths_nighthours_best <- res_learning$bandwiths_nighthours[id_best_nighthours]
+    
     
     ### TESTING
     res_testing <- predictkde("testing", 
@@ -161,17 +171,39 @@ for(iseries in alliseries){
     ######################################
     
     
-    ids_past   <- learn$id
-    ids_future <- test$id		
-    nb_futuredays <- length(seq_testing_interval)/48
+    #ids_past   <- learn$id
+    #ids_future <- test$id		
+    #nb_futuredays <- length(seq_testing_interval)/48
+    
+    #if(task == "learning"){
+    #  ids_past   <- tail(train$id, (31 + 28 + 31)*48)
+    #  ids_future <- validation$id
+    #  nb_futuredays <- length(seq_validation_interval)/48
+      
+    #  res_file   <- file.path(basef.folder, algo, paste("results_learning_", idseries, "_", algo, ".Rdata", sep = "")) 
+    #  model_file <- file.path(basef.folder, algo, paste("model_learning_", idseries, "_", algo, ".Rdata", sep = "")) 
+
+    #}else if(task == "testing"){
+      ids_past   <- tail(learn$id, (31 + 28 + 31 + 30)*48)
+      ids_future <- test$id
+      nb_futuredays <- length(seq_testing_interval)/48
+      
+      #res_file   <- file.path(basef.folder, algo, paste("results_testing_", idseries, "_", algo, ".Rdata", sep = "")) 
+      #model_file <- file.path(basef.folder, algo, paste("model_testing_", idseries, "_", algo, ".Rdata", sep = "")) 
+      
+    #}else{
+    #  stop("ERROR !")
+    #}
+    
+    
     
     model <- NULL
     
     all_qf <- all_mf <- all_sd <- vector("list", nb_futuredays)
     
     for(id_future_day in seq(1, nb_futuredays)){
-      print(id_future_day)
-      print(base::date())
+      #print(id_future_day)
+      #print(base::date())
       offset_nhours <- (id_future_day - 1) * 48
       
       ids_future_hours <- ids_future[1 + offset_nhours] + seq(0, 47)
@@ -193,51 +225,76 @@ for(iseries in alliseries){
       #               use.parallel = F, num.cores = 1,
       #               use.box.cox = F)
       
-      # NO TIME OF WEEK EFFECT for bottom series!!!
-      if(iseries <= n_agg){
+      
+      
+      if(do.agg){
         seasonal.periods <- c(48, 336)
       }else{
         seasonal.periods <- c(336) # c(48) !!!!!!!!!!!!!!!!!!!
       }
      
+      do.logtrans <- TRUE
+      if(do.logtrans){
+        my_ts <- log(y)	     
+      }else{
+        my_ts <- y
+      }
       
-      model <- modelfct(y, 
+      model <- modelfct(my_ts, 
                         seasonal.periods = seasonal.periods, 
                         use.trend = F, use.damped.trend = F, 
                         use.arma.errors = T, max.p = 2, max.q = 2, 
-                        use.parallel = T, num.cores = ncores,
-                        use.box.cox = T, bc.lower=0, bc.upper=10^-9)
+                        use.parallel = F, num.cores = 1,
+                        use.box.cox = F)
       
-      if(id_future_day %in% c(1, seq(10, 90, 10)))
-      {
+      if(do.logtrans){
+        yfitted <- exp(fitted(model))
+      }else{
+        yfitted <- fitted(model)
+      }
+      
+      #list_yfitted[[id_future_day]] <- yfitted
+      
+      #if(id_future_day %in% c(1, seq(10, 90, 10)))
+      #{
         #print(date())
         #print("Writing")
-        model_file <- file.path(basef.folder, algo, paste("model_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
-        save(file = model_file, list = c("model"))
-      }
+        #model_file <- file.path(basef.folder, algo, paste("model_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+        #save(file = model_file, list = c("model"))
+      #}
       
       res <- forecast(model, h = 48, level = 95)
       
-      # mu		                   
+      # mu
       mu_hat <- res$mean
-      all_mf[[id_future_day]] <- mu_hat
       
       # sd
       sd_hat <- (res$upper-res$lower)/1.96/2
-      all_sd[[id_future_day]] <- sd_hat
+      #all_sd[[id_future_day]] <- sd_hat
       
       qf <- matrix(NA, nrow = length(alphas), ncol = 48)
       for(h in seq(48))
-        #qf[,h] <- qnorm(alphas, mu_hat[h], sd_hat[h])
-        qf[,h] <- qtnorm(alphas, mean= mu_hat[h], sd= sd_hat[h], lower=0, upper=Inf, lower.tail = TRUE, log.p = FALSE)
+        qf[,h] <- qnorm(alphas, mu_hat[h], sd_hat[h])
+        #qf[,h] <- qtnorm(alphas, mean= mu_hat[h], sd= sd_hat[h], lower=0, upper=Inf, lower.tail = TRUE, log.p = FALSE)
       
+      if(do.logtrans){
+        qf <- exp(qf)
+      }
       all_qf[[id_future_day]] <- qf
       
+      
+      if(do.logtrans){
+        mu_hat <- exp(res$mean)
+      }
+      all_mf[[id_future_day]] <- mu_hat
+      
+      
     } # test days	
-    save(file = res_file, list = c("all_qf", "all_mf", "sd_hat"))
+    save(file = res_file, list = c("all_qf", "all_mf"))
     
   } # (T)BATS test
   
   #} # algorithms
-  #print(date())
+
 }
+#}, mc.cores = 2)

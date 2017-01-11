@@ -207,6 +207,7 @@ kde <- function(id_query, ids_data, bandwiths){
 
 predictkde <- function(task = c("learning", "testing"), bandwiths_nighthours = NULL, bandwiths_dayhours = NULL){
   
+  
   if(task == "learning"){
     #ids_past   <- train$id
     #ids_future <- validation$id
@@ -214,7 +215,7 @@ predictkde <- function(task = c("learning", "testing"), bandwiths_nighthours = N
     ids_past   <- tail(train$id, 48 * 90)
     ids_future <- validation$id
     
-    
+   
     
     ##### Bandwith interval #####
     n_base <- length(train$id)
@@ -227,17 +228,25 @@ predictkde <- function(task = c("learning", "testing"), bandwiths_nighthours = N
     }
     stopifnot(!is.null(n_approx))
     
+    #print(mykernel)
+    #print("ok")
+    
+    
     if(mykernel == "normal" || mykernel == "truncated"){
       x_samples <- sample(demand[ids_past], n_approx)
     }else if(mykernel == "lognormal"){
       x_samples <- log(sample(demand[ids_past], n_approx))
     }
+    
+    #print("ok")
     h_silver <- 0.9 * min(sd(x_samples), IQR(x_samples)/1.349) * n_approx ^(-.2)
     
     if(h_silver == 0){
       h_silver <- 0.01
     }
     bandwiths <- c(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 3, 4, 5) * h_silver	
+    
+   
     
     stopifnot(all(bandwiths>0))
     

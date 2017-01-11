@@ -66,6 +66,9 @@ x <- x %>% filter(!grepl("-", NUTS4))
 # Remove few weird meters
 x <- x %>% filter(!IDMETER %in% c(6228, 13154, 9503))
 
+# Some meter with high consumption during the night 
+x <- x %>% filter(!IDMETER %in% c(12874L, 6951L, 14738L, 925L, 8255L))
+
 # Each node must have at least two children nodes (NUTS HIERARCHY)
 idset <- which(x[, "NUTS4"] == "UKF2100")
 res <- split(idset, c(1,2))
@@ -109,6 +112,7 @@ itree <- graph.data.frame(myedges)
 itree <- simplify(itree, remove.loops = F)
 # plot(itree, layout = layout.reingold.tilford(itree, root=1, circular=T), vertex.label.cex = 0.4, vertex.size = 1, vertex.label.dist = .2)
 # MUCH BETTER: plot(itree, layout = layout.reingold.tilford(itree, root=1, circular=T), vertex.size=0, vertex.label=NA, edge.arrow.size=0)
+#browser()
 
 # Compute Sagg - for each agg. node, compute the associated leafs
 all.nodes.names <- V(itree)$name
