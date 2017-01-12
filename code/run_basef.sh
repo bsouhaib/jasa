@@ -2,8 +2,8 @@
 
 rscript="basef.R"
 
-#algo="KD-IC-NML"
-algo="TBATS"
+algo="KD-IC-NML"
+#algo="TBATS"
 
 doagg=TRUE
 tag="agg"

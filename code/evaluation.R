@@ -2,9 +2,10 @@ rm(list = ls())
 set.seed(1986)
 args = (commandArgs(TRUE))
 if(length(args) == 0){
-  algo <- c("KD-IC-NML")
-  do.agg <- FALSE
-  ijob <- 4
+  #algo <- c("KD-IC-NML")
+  algo <- "TBATS"
+  do.agg <- TRUE
+  ijob <- NA
   #alliseries <- NULL
   
 }else{
@@ -160,6 +161,7 @@ for(i in seq_along(alliseries)){
   }# idtest
   
   if(do.agg){
+    dir.create(file.path(loss.folder, algo), showWarnings = FALSE)
     qs_file <- file.path(loss.folder, algo, paste("qs_", algo, "_", idseries, ".Rdata", sep = "")) 
     save(file = qs_file, list = c("qs_all"))
     

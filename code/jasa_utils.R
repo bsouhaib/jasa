@@ -38,7 +38,7 @@ crps_sampling <- function(X, obs){
   mean(abs(X - obs)) - 0.5 * mean(abs(Xprime))
 }
 
-kde <- function(id_query, ids_data, bandwiths){
+kde <- function(id_query, ids_data, bandwiths, only.mean = FALSE){
   #print(id_query)
   ####
   if(algo == "KD-U"){
@@ -65,7 +65,7 @@ kde <- function(id_query, ids_data, bandwiths){
   q90 <- quantile(x, .9)
   q91 <- quantile(x, .91)
   
-  crps <- squared_error <- mu_hat <- var_hat <- numeric(length(bandwiths))
+  crps <- residuals <- squared_error <- mu_hat <- var_hat <- numeric(length(bandwiths))
   for(i in seq_along(bandwiths)){
     h <- bandwiths[i]
     vech <- rep(h, length(x))
@@ -102,20 +102,20 @@ kde <- function(id_query, ids_data, bandwiths){
       # apply(bumps, 2, function(b){ matplot(xgrid, bumps, lty = 1, type = 'n'); lines(xgrid, b)})
     }
     #########
-    
-    cdfs <- sapply(seq(length(x)), function(i){ 	
-      xi <- x[i]		
-      if(mykernel == "normal"){
-        #pnorm((xgrid - obs)/h)/(n)
-        pnorm((xgrid - xi)/vech[i])/(n)
-      }else if(mykernel == "lognormal"){
-        plnorm(xgrid, meanlog = log(xi), sdlog = vech[i], lower.tail = TRUE, log.p = FALSE)/n
-      }else if(mykernel == "truncated"){
-        ptnorm(xgrid, mean = xi, sd = vech[i], lower = lowerx, upper = upperx, lower.tail = TRUE, log.p = FALSE)/n
-      }
-    })
-    cdf <- rowSums(cdfs)
-    
+    if(!only.mean){
+      cdfs <- sapply(seq(length(x)), function(i){ 	
+        xi <- x[i]		
+        if(mykernel == "normal"){
+          #pnorm((xgrid - obs)/h)/(n)
+          pnorm((xgrid - xi)/vech[i])/(n)
+        }else if(mykernel == "lognormal"){
+          plnorm(xgrid, meanlog = log(xi), sdlog = vech[i], lower.tail = TRUE, log.p = FALSE)/n
+        }else if(mykernel == "truncated"){
+          ptnorm(xgrid, mean = xi, sd = vech[i], lower = lowerx, upper = upperx, lower.tail = TRUE, log.p = FALSE)/n
+        }
+      })
+      cdf <- rowSums(cdfs)
+    }
     #browser()
     
     # Mean forecasts 
@@ -138,7 +138,8 @@ kde <- function(id_query, ids_data, bandwiths){
     
     obs <- demand[id_query]
     
-    squared_error[i] <- (obs - mu_hat[i])^2 
+    residuals[i] <- obs - mu_hat[i] 
+    squared_error[i] <- (residuals[i])^2 
     
     #modelcdf <- smooth.spline(xgrid, cdf)
     #kcdf <- function(x){
@@ -161,28 +162,29 @@ kde <- function(id_query, ids_data, bandwiths){
     #}
     #crps[i] <- integrate(integrand, min(xgrid), max(xgrid))$value
     
-    
-    if(mykernel == "normal"){
-      crps[i] <- crps_mixture(x, vech, obs)
-    }else{
-      invkcdf <- approxfun(cdf, xgrid, rule = 2)
-      X1 <- invkcdf(u1)
-      crps[i] <- mean(abs(X1 - obs)) - 0.5 * mean(abs(X1 - invkcdf(u2)))
-    }
-    
-    if(FALSE){
-      check_function <- function(y, f, tau){
-        tau*(y - f)*((y - f) >= 0) - (1-tau)*(y - f)*((y - f) < 0)
+    if(!only.mean){
+      if(mykernel == "normal"){
+        crps[i] <- crps_mixture(x, vech, obs)
+      }else{
+        invkcdf <- approxfun(cdf, xgrid, rule = 2)
+        X1 <- invkcdf(u1)
+        crps[i] <- mean(abs(X1 - obs)) - 0.5 * mean(abs(X1 - invkcdf(u2)))
       }
-      
-      invkcdf <- approxfun(cdf, xgrid)
-      u <- runif(10000)
-      qf <- invkcdf(u)
-      allqloss <- sapply(seq(length(u)), function(i){
-        check_function(obs, qf[i], u[i])
-      })
-      (2* sum(allqloss, na.rm = T))/10000
     }
+    
+     #if(FALSE){
+     # check_function <- function(y, f, tau){
+     #    tau*(y - f)*((y - f) >= 0) - (1-tau)*(y - f)*((y - f) < 0)
+     #}
+      
+     # invkcdf <- approxfun(cdf, xgrid)
+     #  u <- runif(10000)
+     # qf <- invkcdf(u)
+     #  allqloss <- sapply(seq(length(u)), function(i){
+     #   check_function(obs, qf[i], u[i])
+     # })
+     # (2* sum(allqloss, na.rm = T))/10000
+     #}
     
   }
   
@@ -198,16 +200,20 @@ kde <- function(id_query, ids_data, bandwiths){
   
   
   if(length(bandwiths) == 1){ # TESTING
-    ret <- list(crps = crps, squared_error = squared_error, qtauhat = xgrid, tauhat = cdf, mu_hat = mu_hat, var_hat = var_hat)
+    if(!only.mean){
+      ret <- list(crps = crps, squared_error = squared_error, qtauhat = xgrid, tauhat = cdf, mu_hat = mu_hat, var_hat = var_hat)
+    }else{
+      ret <- list(residuals = residuals, squared_error = squared_error, mu_hat = mu_hat, var_hat = var_hat)
+    }
   }else{ # LEARNING
     ret <- list(crps = crps, squared_error = squared_error, qtauhat = NULL, tauhat = NULL, mu_hat = mu_hat, var_hat = var_hat)
   }
   
 }
 
-predictkde <- function(task = c("learning", "testing"), bandwiths_nighthours = NULL, bandwiths_dayhours = NULL){
+predictkde <- function(task = c("learning", "testing", "residuals"), bandwiths_nighthours = NULL, bandwiths_dayhours = NULL){
   
-  
+  onlymean <- FALSE
   if(task == "learning"){
     #ids_past   <- train$id
     #ids_future <- validation$id
@@ -267,6 +273,13 @@ predictkde <- function(task = c("learning", "testing"), bandwiths_nighthours = N
     ids_future <- test$id
     
     nb_futuredays <- length(seq_testing_interval)/48
+  }else if(task == "residuals"){
+    ids_past   <- head(learn$id, 48 * 90)
+    ids_future <- tail(learn$id, -48 * 90)
+    
+    nb_futuredays <- length(ids_future)/48
+    
+    onlymean <- TRUE
   }
   
   res_nighthours <- res_dayhours <- vector("list", nb_futuredays)
@@ -288,8 +301,8 @@ predictkde <- function(task = c("learning", "testing"), bandwiths_nighthours = N
     }
     
     # 48-hours ahead forecasts
-    res_nighthours[[id_future_day]] <- lapply(ids_future_nighthours, function(id){kde(id, ids_past_actual, bandwiths_nighthours)})
-    res_dayhours[[id_future_day]] <- lapply(ids_future_dayhours, function(id){kde(id, ids_past_actual, bandwiths_dayhours)})	
+    res_nighthours[[id_future_day]] <- lapply(ids_future_nighthours, function(id){kde(id, ids_past_actual, bandwiths_nighthours, onlymean)})
+    res_dayhours[[id_future_day]] <- lapply(ids_future_dayhours, function(id){kde(id, ids_past_actual, bandwiths_dayhours, onlymean)})	
   }	
   
   list(res_nighthours = res_nighthours, res_dayhours = res_dayhours, 

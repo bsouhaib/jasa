@@ -10,31 +10,71 @@ source("utils.R")
 load(file.path(work.folder, "myinfo.Rdata"))
 #load(file.path(work.folder, "OLDMYINFO.Rdata"))
 
+algorithms <- c("TBATS", "KD-IC-NML")
+do.agg <- TRUE
+alliseries <- seq(n_agg)
 
-algo <- "KD-IC-NML"
-do.agg <- FALSE
-alljobs <- c(1, 2, 3, 4)
+M <- 1128
+q_probs <- seq(M)/(M + 1)
 
-set_series <- bottomSeries
-if(do.agg)
-  set_series <- aggSeries
-
-
-nseries <- length(set_series)
 ntest <- length(test$id)
-alliseries <- seq(nseries)
+
+if(do.agg){
+  set_series <- aggSeries[alliseries]
+}else{
+  set_series <- bottomSeries[alliseries]
+  
+  alljobs <- c(1, 2, 3, 4)
+}
+nseries <- length(set_series)
+
 allqcrps <- allmse <- matrix(NA, nrow = nseries, ncol = ntest)
 
-for(ijob in alljobs){
-  
-  res_crps_file <- file.path(loss.folder, algo, paste("crps_", algo, "_", ijob, ".Rdata", sep = "")) 
-  res_mse_file <- file.path(loss.folder, algo, paste("mse_", algo, "_", ijob, ".Rdata", sep = "")) 
-  load(res_crps_file) # "crps"
-  load(res_mse_file) # "mse"
-  
-  allqcrps[match(rownames(qcrps), set_series), ] <- qcrps
-  allmse[match(rownames(qcrps), set_series), ] <- mse
+mat_qs <- array(NA, c(M,  nseries, 48, length(algorithms)))
+
+for(ialgo in seq_along(algorithms)){
+  algo <- algorithms[ialgo]
+  if(!do.agg){
+    for(ijob in alljobs){
+      
+      res_crps_file <- file.path(loss.folder, algo, paste("crps_", algo, "_", ijob, ".Rdata", sep = "")) 
+      res_mse_file <- file.path(loss.folder, algo, paste("mse_", algo, "_", ijob, ".Rdata", sep = "")) 
+      load(res_crps_file) # "crps"
+      load(res_mse_file) # "mse"
+      
+      allqcrps[match(rownames(qcrps), set_series), ] <- qcrps
+      allmse[match(rownames(qcrps), set_series), ] <- mse
+    }
+      
+  }else{
+    
+    mat_qs_algo <- array(NA, c(M, ntest, nseries))
+    for(i in seq_along(set_series)){
+      idseries <- set_series[i]
+      qs_file <- file.path(loss.folder, algo, paste("qs_", algo, "_", idseries, ".Rdata", sep = "")) 
+      load(qs_file)
+      mat_qs_algo[, , i] <- qs_all
+    }
+    
+    v <- sapply(seq(48), function(h){
+      apply(mat_qs_algo[, seq(h, ntest, by = 48) , ], c(1, 3), mean)
+    }, simplify = "array")
+    mat_qs[, , , ialgo] <- v
+  }
 }
+
+stop("done")
+
+savepdf(file.path(results.folder, paste("JASA_QS", sep = "") ))
+par(mfrow = c(3, 3))
+# array(NA, c(M,  nseries, 48, length(algorithms)))
+for(iagg in seq(n_agg)){
+  for(h in c(1, seq(2, 48, by = 7), 48) ){
+    matplot(q_probs, mat_qs[, iagg, h, ], lty = 1, type = 'l', col = c("red", "blue"), ylab = "QS", xlab = "prob", main = paste(aggSeries[iagg], " - ", h, sep ="") )
+  }
+}
+dev.off()
+
 
 qcrps_series <- apply(allqcrps, 1, mean)
 
