@@ -5,10 +5,12 @@ if(length(args) == 0){
   #hierarchy <- "geo"
   #ncores <- 2
   algo <- c("KD-IC-NML")
-  algo <- c("TBATS")
+  #algo <- c("TBATS")
 
-  do.agg <- TRUE
-  alliseries <- 1
+  #do.agg <- TRUE
+  #alliseries <- 1
+  do.agg <- FALSE
+  alliseries <- 10
   
 }else{
   
@@ -75,9 +77,9 @@ for(iseries in alliseries){
   }
   
   
-  set.seed(1986)
-  u1 <- runif(10000)
-  u2 <- runif(10000)
+  #set.seed(1986)
+  #u1 <- runif(10000)
+  #u2 <- runif(10000)
   
   #for(algo in algorithms){
   
@@ -109,6 +111,7 @@ for(iseries in alliseries){
     
     #print(mykernel)
     ### LEARNING
+    #print("learning")
     res_learning <- predictkde("learning")
     
     # Best bandwith for dayhours
@@ -125,11 +128,13 @@ for(iseries in alliseries){
     
     
     ### TESTING
+    #print("testing")
     res_testing <- predictkde("testing", 
                               bandwiths_nighthours = bandwiths_nighthours_best, 
                               bandwiths_dayhours = bandwiths_dayhours_best)
     
     ### RESIDUALS
+    #print("residuals")
     res_residuals <- predictkde("residuals", 
                               bandwiths_nighthours = bandwiths_nighthours_best, 
                               bandwiths_dayhours = bandwiths_dayhours_best)
@@ -137,6 +142,7 @@ for(iseries in alliseries){
     save(file = res_file, list = c("res_learning", "res_testing", "res_residuals"))
   }else if(algo %in% c("TBATS", "BATS")){
     
+    only.resid <- TRUE
     
     if(algo == "TBATS"){
       modelfct <- tbats
@@ -190,7 +196,8 @@ for(iseries in alliseries){
     #  model_file <- file.path(basef.folder, algo, paste("model_learning_", idseries, "_", algo, ".Rdata", sep = "")) 
 
     #}else if(task == "testing"){
-      ids_past   <- tail(learn$id, (31 + 28 + 31 + 30)*48)
+   
+      #ids_past   <- tail(learn$id, (31 + 28 + 31 + 30)*48)
       ids_future <- test$id
       nb_futuredays <- length(seq_testing_interval)/48
       
@@ -201,57 +208,40 @@ for(iseries in alliseries){
     #  stop("ERROR !")
     #}
     
-    
-    
     model <- NULL
     
     all_qf <- all_mf <- all_sd <- vector("list", nb_futuredays)
     
-    for(id_future_day in seq(1, nb_futuredays)){
+    mydays <- seq(1, nb_futuredays)
+    if(only.resid){
+      mydays <- 1
+    }
+    
+    for(id_future_day in mydays){
       #print(id_future_day)
       #print(base::date())
+
+      if(id_future_day == 1){
+        ids_past   <-  learn$id
+        n_past_obs <- length(ids_past)
+      }else{
+        n_past_obs <- n_past_obs_tbats
+        ids_past   <- tail(learn$id, n_past_obs)
+      }
+      
       offset_nhours <- (id_future_day - 1) * 48
       
-      ids_future_hours <- ids_future[1 + offset_nhours] + seq(0, 47)
+      #ids_future_hours <- ids_future[1 + offset_nhours] + seq(0, 47)
+      ids_future_hours <- ids_future[offset_nhours + seq(1, 48)] 
       
       if(offset_nhours > 0){
-        ids_past_actual <- c(tail(ids_past, -offset_nhours), head(ids_future, offset_nhours))
+        #ids_past_actual <- c(tail(ids_past, -offset_nhours), head(ids_future, offset_nhours))
+        ids_past_actual <- c(ids_past, ids_future)[offset_nhours + seq(n_past_obs)]
       }else{
         ids_past_actual <- ids_past
       }
       
       y <- demand[ids_past_actual]
-      
-      #print(date())
-      # 48-hours ahead forecasts
-      
-      
-      #model <- modelfct(y, seasonal.periods = c(48, 336), use.trend = F, use.damped.trend = F, 
-      #               use.arma.errors = T, max.p = 2, max.q = 2, 
-      #               use.parallel = F, num.cores = 1,
-      #               use.box.cox = F)
-      
-      #stop("done")
-      stop("done")
-      
-      # x <- msts(taylor, seasonal.periods=c(48,336), start=2000+22/52)
-      # f1 <- forecast(x, h = 270)
-      
-      # x <- msts(taylor, seasonal.periods = c(48, 336))
-      # f2 <- forecast(x, h = 270)
-      
-      # taylor.lm <- tslm(taylor ~ fourier(taylor, K = c(3, 3)))
-      # f3 <- forecast(taylor.lm, data.frame(fourier(taylor, K = c(3, 3), h = 270)))
-      
-      # x <- msts(y, seasonal.periods = c(48, 336))
-      # fit <- Arima(y, order=c(2,0,1), xreg=fourier(y, K=4)) or fit <- auto.arima(x, seasonal=FALSE, xreg=fourier(x, K= c(2, 2) ))
-      # e <- resid(fit)
-      # plot(forecast(fit, h=48, xreg=fourier(x, K= c(2, 2), h = 48)), include = 48 *7)
-      # plot(forecast(fit, h=2*m, xreg=fourier(y, K=4, h=2*m)))
-      # 
-      
-      # x <- msts(y, seasonal.periods = c(48, 336))
-      # fcast <- forecast(x, h = 48 * 6)
       
       if(do.agg){
         seasonal.periods <- c(48, 336)
@@ -259,7 +249,7 @@ for(iseries in alliseries){
         seasonal.periods <- c(336) # c(48) !!!!!!!!!!!!!!!!!!!
       }
      
-      do.logtrans <- T
+      do.logtrans <- F
       if(do.logtrans){
         my_ts <- log(y)	     
       }else{
@@ -273,14 +263,26 @@ for(iseries in alliseries){
                         use.parallel = F, num.cores = 1,
                         use.box.cox = F)
       
-      if(do.logtrans){
-        yfitted <- exp(fitted(model))
-      }else{
-        yfitted <- fitted(model)
+      backtransform_log <- function(x, fvar){
+        exp(x) * (1 + 0.5 * fvar)
       }
       
-      #list_yfitted[[id_future_day]] <- yfitted
+      if(do.logtrans){
+        #yfitted <- exp(fitted(model))
+        e_residuals <- exp(model$y) - backtransform_log(fitted(model), model$variance)
+      }else{
+        #yfitted <- fitted(model)
+        e_residuals <- resid(model)
+      }
       
+      if(id_future_day == 1)
+      {
+        dir.create(file.path(residuals.folder, algo), recursive = TRUE, showWarnings = FALSE)
+        resid_file <- file.path(residuals.folder, algo, paste("residuals_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+        save(file = resid_file, list = c("e_residuals"))
+      } 
+      
+      #list_yfitted[[id_future_day]] <- yfitted
       #if(id_future_day %in% c(1, seq(10, 90, 10)))
       #{
         #print(date())
@@ -289,40 +291,40 @@ for(iseries in alliseries){
         #save(file = model_file, list = c("model"))
       #}
       
-      res <- forecast(model, h = 48, level = 95)
-      
-      # mu
-      mu_hat <- res$mean
-      
-      # sd
-      sd_hat <- (res$upper-res$lower)/1.96/2
-      #all_sd[[id_future_day]] <- sd_hat
-      
-      qf <- matrix(NA, nrow = length(alphas), ncol = 48)
-      for(h in seq(48))
-        qf[,h] <- qnorm(alphas, mu_hat[h], sd_hat[h])
-        #qf[,h] <- qtnorm(alphas, mean= mu_hat[h], sd= sd_hat[h], lower=0, upper=Inf, lower.tail = TRUE, log.p = FALSE)
-      
-      if(do.logtrans){
-        qf <- exp(qf)
+      if(!only.resid){
+        res <- forecast(model, h = 48, level = 95)
+        
+        # mu
+        mu_hat <- res$mean
+        
+        # sd
+        sd_hat <- (res$upper-res$lower)/1.96/2
+        #all_sd[[id_future_day]] <- sd_hat
+        
+        qf <- matrix(NA, nrow = length(alphas), ncol = 48)
+        for(h in seq(48))
+          qf[,h] <- qnorm(alphas, mu_hat[h], sd_hat[h])
+          #qf[,h] <- qtnorm(alphas, mean= mu_hat[h], sd= sd_hat[h], lower=0, upper=Inf, lower.tail = TRUE, log.p = FALSE)
+        
+        if(do.logtrans){
+          qf <- exp(qf)
+        }
+        all_qf[[id_future_day]] <- qf
+        
+        
+        if(do.logtrans){
+          #mu_hat <- exp(res$mean)  
+          mu_hat <- backtransform_log(res$mean, sd_hat^2)
+        }
+        all_mf[[id_future_day]] <- mu_hat
       }
-      all_qf[[id_future_day]] <- qf
-      
-      
-      if(do.logtrans){
-        mu_hat <- exp(res$mean)
-      }
-      all_mf[[id_future_day]] <- mu_hat
-      
       
       
       
     } # test days	
+    
+    if(!only.resid)
     save(file = res_file, list = c("all_qf", "all_mf"))
     
   } # (T)BATS test
-  
-  #} # algorithms
-
 }
-#}, mc.cores = 2)

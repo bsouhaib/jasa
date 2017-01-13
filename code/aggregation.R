@@ -7,7 +7,8 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-algo <- "KD-IC-NML"
+# Generate samples
+
 
 # compute the parsing order of the aggregate nodes
 leaves <- V(itree)[degree(itree, mode="out") == 0]
@@ -18,44 +19,16 @@ res <- sapply(agg_nodes, function(agg_node){
   max( vec[which(vec!=Inf)])
 })
 
-ordered_aggnodes_names <- names(sort(res))
+ordered_agg_nodes_names <- names(sort(res))
+ordered_agg_nodes <- V(itree)[match(ordered_agg_nodes_names, V(itree)$name)]
 
-for(aggnode_name in ordered_aggnodes_names){
+stop("done")
+
+for(agg_node in ordered_agg_nodes){
   
-  i_node <- which(V(itree)$name == aggnode_name)
-  children <- ego(itree, order = 1, nodes = i_node, mode = "out")[[1]][-1]
-  
-  # estimate empirical copula
-  
-    # load data for all children
-    # compute ranks
-    # save ranks in matrix
+  # load permutation file
   
   # permutate the associated samples 
   
 }
 
-
-getPerm <- function(idseries){
-  
-  # identify the children
-  # save rank matrix (with each colnames with the right name)
-}
-
-
-# for each node, run myperm(idseries)
-
-myperm <- function(idseries){
-  
-  # load the rank matrix 
-  
-  # hierarchical permutations of the children
-
-}
-
-# Generate samples for all bottom nodes
-
-# for each aggregate nodes
-  # compute the copula (permutations) 
-  # permutate the tows
-  # compute the sum

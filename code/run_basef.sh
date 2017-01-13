@@ -5,30 +5,29 @@ rscript="basef.R"
 algo="KD-IC-NML"
 #algo="TBATS"
 
-doagg=TRUE
-tag="agg"
-
-if [[ "$1" -eq 1 ]]; then
-	alliseries=$(seq 1 14 )
-elif [[ "$1" -eq 2 ]]; then
-	alliseries=$(seq 15 28 )
-elif [[ "$1" -eq 3 ]]; then
-	alliseries=$(seq 29 40 )
-elif [[ "$1" -eq 4 ]]; then
-	alliseries=$(seq 41 55 )
-fi
-
-#doagg=FALSE
-#tag="bottom"
+#doagg=TRUE
+#tag="agg"
 #if [[ "$1" -eq 1 ]]; then
-#	alliseries=$(seq 1 4 1584 )
+#	alliseries=$(seq 1 14 )
 #elif [[ "$1" -eq 2 ]]; then
-#	alliseries=$(seq 2 4 1584 )
+#	alliseries=$(seq 15 28 )
 #elif [[ "$1" -eq 3 ]]; then
-#	alliseries=$(seq 3 4 1584 )
+#	alliseries=$(seq 29 40 )
 #elif [[ "$1" -eq 4 ]]; then
-#	alliseries=$(seq 4 4 1584 )
+#	alliseries=$(seq 41 55 )
 #fi
+
+doagg=FALSE
+tag="bottom"
+if [[ "$1" -eq 1 ]]; then
+	alliseries=$(seq 1 4 1584 )
+elif [[ "$1" -eq 2 ]]; then
+	alliseries=$(seq 2 4 1584 )
+elif [[ "$1" -eq 3 ]]; then
+	alliseries=$(seq 3 4 1584 )
+elif [[ "$1" -eq 4 ]]; then
+	alliseries=$(seq 4 4 1584 )
+fi
 
 
 #echo "${alliseries[@]}"

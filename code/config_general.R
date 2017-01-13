@@ -17,17 +17,22 @@ index_hours <- sort(hours_all, index = T)$ix
 
 iday_withmodels <- c(1, seq(10, 90, 10))
 
+#n_past_obs_kd    <- 90 *48
+n_past_obs_kd    <- 60 *48
+n_past_obs_tbats <- (31 + 28 + 31 + 30)*48
 
-all_algorithms <- c("Uncond", "TBATS", "KD-IC-NML", "PeriodOfDay", "BU-NNLS-INDEP-TBATS",  "BU-NNLS-PERM-TBATS", "BU-INDEP-TBATS", "BU-PERM-TBATS")
-all_algorithms <- c(all_algorithms, "BU-NNLS-INDEP-KD", "BU-NNLS-PERM-KD", "BU-INDEP-KD", "BU-PERM-KD")
-all_algorithms <- c(all_algorithms, "BU-NNLS-PERM-TBATS-KD", "BU-NNLS-INDEP-TBATS-KD") 
-all_algorithms <- c(all_algorithms, "BU-WNNLS-PERM-TBATS")
-all_algorithms <- c(all_algorithms, "BU-WNNLSAAAI-PERM-TBATS")
+M <- 1128
+q_probs <- seq(M)/(M + 1)
 
+#all_algorithms <- c("Uncond", "TBATS", "KD-IC-NML", "PeriodOfDay", "BU-NNLS-INDEP-TBATS",  "BU-NNLS-PERM-TBATS", "BU-INDEP-TBATS", "BU-PERM-TBATS")
+#all_algorithms <- c(all_algorithms, "BU-NNLS-INDEP-KD", "BU-NNLS-PERM-KD", "BU-INDEP-KD", "BU-PERM-KD")
+#all_algorithms <- c(all_algorithms, "BU-NNLS-PERM-TBATS-KD", "BU-NNLS-INDEP-TBATS-KD") 
+#all_algorithms <- c(all_algorithms, "BU-WNNLS-PERM-TBATS")
+#all_algorithms <- c(all_algorithms, "BU-WNNLSAAAI-PERM-TBATS")
 
-all_colors <- c("red", "brown", "green", "darkblue","cyan", "orange", "purple", "blue")
-all_colors <- c(all_colors, "cyan", "orange", "purple", "blue")
-all_colors <- c(all_colors, "darkgreen", "darkgreen")
-all_colors <- c(all_colors, "grey")
-all_colors <- c(all_colors, "orange")
+#all_colors <- c("red", "brown", "green", "darkblue","cyan", "orange", "purple", "blue")
+#all_colors <- c(all_colors, "cyan", "orange", "purple", "blue")
+#all_colors <- c(all_colors, "darkgreen", "darkgreen")
+#all_colors <- c(all_colors, "grey")
+#all_colors <- c(all_colors, "orange")
 

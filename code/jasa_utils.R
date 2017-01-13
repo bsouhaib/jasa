@@ -49,6 +49,7 @@ kde <- function(id_query, ids_data, bandwiths, only.mean = FALSE){
     ids_data_kept <- ids_data[which(calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] 
                                     & calendar$periodOfDay[ids_data] == calendar$periodOfDay[id_query])  ]
   }
+  #print(length(ids_data_kept))
   
   x <- demand[ids_data_kept]
   ####
@@ -213,12 +214,14 @@ kde <- function(id_query, ids_data, bandwiths, only.mean = FALSE){
 
 predictkde <- function(task = c("learning", "testing", "residuals"), bandwiths_nighthours = NULL, bandwiths_dayhours = NULL){
   
+  n_past_obs <- n_past_obs_kd
   onlymean <- FALSE
   if(task == "learning"){
+    
     #ids_past   <- train$id
     #ids_future <- validation$id
     
-    ids_past   <- tail(train$id, 48 * 90)
+    ids_past   <- tail(train$id, n_past_obs)
     ids_future <- validation$id
     
    
@@ -269,17 +272,18 @@ predictkde <- function(task = c("learning", "testing", "residuals"), bandwiths_n
     #ids_past   <- learn$id
     #ids_future <- test$id
     
-    ids_past   <- tail(learn$id, 48 * 90)
+    ids_past   <- tail(learn$id, n_past_obs)
     ids_future <- test$id
     
     nb_futuredays <- length(seq_testing_interval)/48
   }else if(task == "residuals"){
-    ids_past   <- head(learn$id, 48 * 90)
-    ids_future <- tail(learn$id, -48 * 90)
+    ids_past   <- head(learn$id, n_past_obs)
+    ids_future <- tail(learn$id, -n_past_obs)
     
     nb_futuredays <- length(ids_future)/48
     
     onlymean <- TRUE
+    #browser()
   }
   
   res_nighthours <- res_dayhours <- vector("list", nb_futuredays)
@@ -289,16 +293,24 @@ predictkde <- function(task = c("learning", "testing", "residuals"), bandwiths_n
     
     offset_nhours <- (id_future_day - 1) * 48
     
-    ids_future_hours <- ids_future[1 + offset_nhours] + seq(0, 47)
+    #ids_future_hours <- ids_future[1 + offset_nhours] + seq(0, 47)
+    ids_future_hours <- ids_future[offset_nhours + seq(1, 48)] 
     
     ids_future_nighthours <- ids_future_hours[which(calendar$periodOfDay[ids_future_hours] %in% hours_night)]
     ids_future_dayhours   <- ids_future_hours[which(calendar$periodOfDay[ids_future_hours] %in% hours_day)]
     
     if(offset_nhours > 0){
-      ids_past_actual <- c(tail(ids_past, -offset_nhours), head(ids_future, offset_nhours))
+      #ids_past_actual <- c(tail(ids_past, -offset_nhours), head(ids_future, offset_nhours))
+      ids_past_actual <- c(ids_past, ids_future)[offset_nhours + seq(n_past_obs)]
     }else{
       ids_past_actual <- ids_past
     }
+    
+    # print(length(ids_past_actual))
+    # if(length(ids_past_actual) > 4080){
+    #  browser()
+    # }
+     
     
     # 48-hours ahead forecasts
     res_nighthours[[id_future_day]] <- lapply(ids_future_nighthours, function(id){kde(id, ids_past_actual, bandwiths_nighthours, onlymean)})

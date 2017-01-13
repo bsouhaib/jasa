@@ -7,6 +7,68 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
+# compute the parsing order of the aggregate nodes
+leaves <- V(itree)[degree(itree, mode="out") == 0]
+agg_nodes <- V(itree)[degree(itree, mode="out") != 0]
+
+for(agg_node in agg_nodes){
+  idseries_agg <- names(agg_node)
+  children_nodes <- ego(itree, order = 1, nodes = agg_node, mode = "out")[[1]][-1]
+  print(children_nodes)
+    
+    mat_residuals <- sapply(seq_along(children_nodes), function(inode){
+      child_node <- children_nodes[inode]
+      isbottom <- (child_node %in% leaves)
+      idseries <- names(child_node)
+      if(isbottom){
+        res_file <- file.path(basef.folder, "KD-IC-NML", paste("results_", idseries, "_", "KD-IC-NML", ".Rdata", sep = "")) 
+        load(res_file)
+        e_residuals <- sapply(tail(learn$id, -n_past_obs_kd), function(id){
+          iday <- getInfo(id)$iday
+          hour <- getInfo(id)$hour
+          #browser()
+          if(hour %in% hours_night){
+            index <- match(hour, hours_night)
+            residhat <- res_residuals$res_nighthours[[iday]][[index]]$residuals
+          }else{
+            index <- match(hour, hours_day)
+            residhat <- res_residuals$res_dayhours[[iday]][[index]]$residuals
+          }
+          residhat
+        })
+        e_residuals <- c(rep(NA, n_past_obs_kd), e_residuals)
+
+      }else{
+        resid_file <- file.path(residuals.folder, "TBATS", paste("residuals_", idseries, "_", "TBATS", "_", 1, ".Rdata", sep = "")) 
+        load(resid_file)
+        #e_residuals
+      }
+      e_residuals
+    })
+    
+    # remove the first few rows (not available for KD)
+    mat_residuals <- tail(mat_residuals, n_past_obs_kd)
+    
+    stop("done")
+    
+    # compute ranks by time of day
+    n_resid <- nrow(mat_residuals)
+    stopifnot(n_resid %% 48 == 0)
+    for(h in seq(48)){
+      residuals_h <- mat_residuals[seq(h, n_resid, by = 48), ]
+      # !!! check ties - rank vs order ???
+      permutations <- sapply(residuals_h, 2, rank)
+      colnames(permutations) <- names(children_nodes)
+     
+      perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, "_", h, ".Rdata", sep = "")) 
+      save(file = perm_file, list = c("permutations"))
+    }
+}
+
+
+
+
+
 algo <- "KD-IC-NML"
 
 ids <- tail(learn$id, -48 * 90)
@@ -22,7 +84,7 @@ mat_residhat <- mat_muhat <- mat_varhat  <- mat_demand <- matrix(NA, nrow = nres
 
 for(i in seq_along(alliseries)){
   iseries <- alliseries[i]
-
+  
   if(do.agg){
     idseries <- aggSeries[iseries]
     load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
@@ -58,7 +120,7 @@ for(i in seq_along(alliseries)){
   
   #plot.ts(demand[head(ids, 48 * 30)], main = idseries)
   #lines(mat_muhat[seq(48*30), i], col = "red")
-
+  
 }
 #ret <- list(residuals = residuals, squared_error = squared_error, mu_hat = mu_hat, var_hat = var_hat)
 
@@ -103,4 +165,3 @@ ii <- seq(nrow(mat_muhat) - 48 * 30, nrow(mat_muhat))
 ii <- 48*30 * 1 + seq(48 * 30)
 plot.ts(mat_demand[ii, 2], main = idseries)
 lines(mat_muhat[ii, 2], col = "red")
-

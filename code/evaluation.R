@@ -54,9 +54,6 @@ print(alliseries)
 #######
 
 
-M <- 1128
-q_probs <- seq(M)/(M + 1)
-
 #do.agg <- FALSE
 #alliseries <- length(bottomSeries)
 #alliseries <- seq(10)
