@@ -21,7 +21,8 @@ iday_withmodels <- c(1, seq(10, 90, 10))
 n_past_obs_kd    <- 60 *48
 n_past_obs_tbats <- (31 + 28 + 31 + 30)*48
 
-M <- 1128
+#M <- 1128
+M <- 948
 q_probs <- seq(M)/(M + 1)
 
 #all_algorithms <- c("Uncond", "TBATS", "KD-IC-NML", "PeriodOfDay", "BU-NNLS-INDEP-TBATS",  "BU-NNLS-PERM-TBATS", "BU-INDEP-TBATS", "BU-PERM-TBATS")

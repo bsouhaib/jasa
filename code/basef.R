@@ -4,13 +4,13 @@ args = (commandArgs(TRUE))
 if(length(args) == 0){
   #hierarchy <- "geo"
   #ncores <- 2
-  algo <- c("KD-IC-NML")
-  #algo <- c("TBATS")
+  #algo <- c("KD-IC-NML")
+  algo <- c("TBATS")
 
-  #do.agg <- TRUE
-  #alliseries <- 1
-  do.agg <- FALSE
-  alliseries <- 10
+  do.agg <- TRUE
+  alliseries <- 1
+  #do.agg <- FALSE
+  #alliseries <- 10
   
 }else{
   
@@ -142,7 +142,7 @@ for(iseries in alliseries){
     save(file = res_file, list = c("res_learning", "res_testing", "res_residuals"))
   }else if(algo %in% c("TBATS", "BATS")){
     
-    only.resid <- TRUE
+    only.resid <- FALSE
     
     if(algo == "TBATS"){
       modelfct <- tbats
@@ -217,6 +217,10 @@ for(iseries in alliseries){
       mydays <- 1
     }
     
+    backtransform_log <- function(x, fvar){
+      exp(x) * (1 + 0.5 * fvar)
+    }
+    
     for(id_future_day in mydays){
       #print(id_future_day)
       #print(base::date())
@@ -249,7 +253,7 @@ for(iseries in alliseries){
         seasonal.periods <- c(336) # c(48) !!!!!!!!!!!!!!!!!!!
       }
      
-      do.logtrans <- F
+      do.logtrans <- T
       if(do.logtrans){
         my_ts <- log(y)	     
       }else{
@@ -263,9 +267,7 @@ for(iseries in alliseries){
                         use.parallel = F, num.cores = 1,
                         use.box.cox = F)
       
-      backtransform_log <- function(x, fvar){
-        exp(x) * (1 + 0.5 * fvar)
-      }
+
       
       if(do.logtrans){
         #yfitted <- exp(fitted(model))
