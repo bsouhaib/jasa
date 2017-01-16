@@ -27,17 +27,20 @@ algo <- "KD-IC-NML"
 ntest <- length(test$id)
 allidtest <- seq(ntest)
 
+list_results_perm <- list_results_naive <- vector("list", ntest)
 
 # Generate samples
 for(idtest in allidtest){
+  print(idtest)
+  print(base::date())
   iday <- getInfo(idtest)$iday
   hour <- getInfo(idtest)$hour
   
   Q <- matrix(NA, nrow = M, ncol = length(alliseries))
   colnames(Q) <- bottomSeries[alliseries]
   for(j in seq_along(alliseries)){
-    if(j%%100 == 0)
-    print(j)
+    #if(j%%100 == 0)
+    #print(j)
     
     iseries <- alliseries[j]
     idseries <- bottomSeries[iseries]
@@ -68,54 +71,90 @@ for(idtest in allidtest){
   
   # rank_X <- apply(Q, 2, rank, ties.method = "random")
   # I know that the rank of each observations is 1 --> M
+  samples <- Q
+  variables <- colnames(samples)
   
-  variables <- colnames(Q)
+  mat_test <- NULL
   # PERM-BU
   for(inode in seq_along(ordered_agg_nodes)){
+    
     agg_node <- ordered_agg_nodes[inode]
     idseries_agg <- names(agg_node)
+    iagg <- match(idseries_agg, aggSeries)
     children_nodes <- ego(itree, order = 1, nodes = agg_node, mode = "out")[[1]][-1]
+    nkids <- length(children_nodes)
     
     # load permutation file
     perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, ".Rdata", sep = "")) 
     load(perm_file) # c("list_permutations", "list_ties")
     
-    perm_idtest <- list_permutations[[hour]]
-    stopifnot(all(colnames(perm_idtest) == names(children_nodes)))
+    ranks_historical <- list_permutations[[hour]]
+    stopifnot(all(colnames(ranks_historical) == names(children_nodes)))
     
     depth_node <- depth_aggnodes[match(idseries_agg, names(depth_aggnodes))]
-    if(depth_node == 1){
-      
-      #Q[, id_cols] <- Q[perm_idtest, id_cols]
-      
-    }else{
-      
-    }  
-     
-    # permutate the associated samples 
-    match(colnames(perm_idtest), variables)
     
+    samples_children <- matrix(NA, nrow = M, ncol = nkids)
+    
+    columns_agg <- which(children_nodes %in% agg_nodes)
+    columns_bottom <- which(children_nodes %in% leaves)
+    children_names <- names(children_nodes)
+    
+    # Extracting/computing the samples for each child
+    if(length(columns_agg) > 0){
+      id_agg_children  <- match(children_names[columns_agg], aggSeries)
+      samples_agg_children <- t(tcrossprod(Sagg[id_agg_children, , drop = F], samples))
+      samples_children[, columns_agg] <- samples_agg_children
+    }
+    
+    if(length(columns_bottom) > 0){
+      id_bottom_children  <- match(children_names[columns_bottom], bottomSeries)
+      samples_children[, columns_bottom] <- samples[, id_bottom_children]
+    }
+    
+    # Computing the ranks of the samples for each child
+    ranks_samples_children <- sapply(seq(ncol(samples_children)), function(j){
+      rank(samples_children[, j], ties.method = "random")
+    })
+    
+    index_mat <- sapply(seq(nkids), function(j){
+      res <- match(ranks_historical[, j], ranks_samples_children[, j])
+      stopifnot(all(!is.na(res)))
+      res
+    })
+    
+    # Permutating the rows
+    if(length(columns_bottom) > 0){
+      samples[, id_bottom_children] <- sapply(seq_along(id_bottom_children), function(j){
+        samples[index_mat[, columns_bottom[j]], id_bottom_children[j]]
+      })
+    }
+    
+    if(length(columns_agg) > 0){
+      res <- lapply(seq_along(id_agg_children), function(j){
+        id <- which(Sagg[id_agg_children[j], ] == 1)
+        #print(id)
+        #print("---")
+        samples[index_mat[, columns_agg[j]], id, drop = F]
+      })
+      ids <- lapply(id_agg_children, function(id_agg_child){
+        which(Sagg[id_agg_child, ] == 1)
+      })
+      ids <- unlist(ids)
+      samples[, ids] <- do.call(cbind, res)
+    }
 
-    browser() 
-  }
+  }# agg node
   
-  # NAIVE-BU
+  # PERM-BU
+  list_results_perm[[idtest]] <- samples_agg <- t(tcrossprod(Sagg, samples))
   
-  # if(NAIVE-BU) Shuffle the samples 
-  
-  # SAVE MARGINAL TOO ?
-  
-  # Sum the samples
-  # samples_agg <- tcrossprod(Sagg, samples)
-  
-  # Compute quantile scores and save them
-  
-  
-  stop("done")
-  
-  
+  # NAIVE-BU - shuffle the samples 
+  list_results_naive[[idtest]] <- samples_agg_naivebu <- t(tcrossprod(Sagg, apply(Q, 2, sample)))
+
 }
 
+# load data for all aggregates
+# Compute quantile scores and save them
 
 
 
