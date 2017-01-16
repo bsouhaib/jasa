@@ -22,7 +22,8 @@ ordered_agg_nodes <- V(itree)[match(ordered_agg_nodes_names, V(itree)$name)]
 ##########
 
 alliseries <- seq(length(bottomSeries))
-algo <- "KD-IC-NML"
+algo.bottom <- algo <- "KD-IC-NML"
+algo.agg <- "TBATS"
 
 ntest <- length(test$id)
 allidtest <- seq(ntest)
@@ -33,6 +34,11 @@ list_results_perm <- list_results_naive <- vector("list", ntest)
 for(idtest in allidtest){
   print(idtest)
   print(base::date())
+  
+  res_byidtest_file <- file.path(basef.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
+  load(res_byidtest_file)
+  # "QF_agg_idtest", "QF_bottom_idtest", "PROB_bottom_idtest"
+  
   iday <- getInfo(idtest)$iday
   hour <- getInfo(idtest)$hour
   
@@ -45,23 +51,29 @@ for(idtest in allidtest){
     iseries <- alliseries[j]
     idseries <- bottomSeries[iseries]
     
-    res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
-    load(res_file)
+    #res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
+    #load(res_file)
+    
     if(algo == "Uncond" || algo == "PeriodOfDay"){
       invcdf <- approxfun(alphas, qFtest[, idtest], rule = 2)
     }else if(algo == "TBATS"){	
-      invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
+      
+      #invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
+    
     }else if(algo == "KD-IC-NML"){	
-      if(hour %in% hours_night){
-        index <- match(hour, hours_night)
-        qtauhat <- res_testing$res_nighthours[[iday]][[index]]$qtauhat
-        tauhat <- res_testing$res_nighthours[[iday]][[index]]$tauhat
-      }else{
-        index <- match(hour, hours_day)
-        qtauhat <- res_testing$res_dayhours[[iday]][[index]]$qtauhat
-        tauhat <- res_testing$res_dayhours[[iday]][[index]]$tauhat
-      }
-      invcdf <- approxfun(tauhat, qtauhat, rule = 2)
+      
+      invcdf <- approxfun(PROB_bottom_idtest[, j], QF_bottom_idtest[, j], rule = 2)
+    
+    #  if(hour %in% hours_night){
+    #    index <- match(hour, hours_night)
+    #    qtauhat <- res_testing$res_nighthours[[iday]][[index]]$qtauhat
+    #    tauhat <- res_testing$res_nighthours[[iday]][[index]]$tauhat
+    #  }else{
+    #    index <- match(hour, hours_day)
+    #    qtauhat <- res_testing$res_dayhours[[iday]][[index]]$qtauhat
+    #    tauhat <- res_testing$res_dayhours[[iday]][[index]]$tauhat
+    #  }
+    #  invcdf <- approxfun(tauhat, qtauhat, rule = 2)
     }else{
       stop("error")
     }
@@ -150,10 +162,10 @@ for(idtest in allidtest){
   
   # NAIVE-BU - shuffle the samples 
   list_results_naive[[idtest]] <- samples_agg_naivebu <- t(tcrossprod(Sagg, apply(Q, 2, sample)))
-
+  stop("done")
 }
 
-# load data for all aggregates
+# load data for all aggregates - obs_agg_idtest
 # Compute quantile scores and save them
 
 
