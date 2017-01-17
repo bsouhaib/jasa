@@ -37,14 +37,13 @@ for(do.agg in c(TRUE, FALSE)){
   if(do.agg){
     set_series <- aggSeries
     algo <- algo.agg
-    
   }else{
     set_series <- bottomSeries
     algo <- algo.bottom
   }
   
   for(j in seq_along(set_series)){
-    #if(j%%100 == 0)
+   # if(j%%100 == 0)
     print(j)
     
     if(do.agg){
@@ -65,10 +64,12 @@ for(do.agg in c(TRUE, FALSE)){
     
     if(do.agg){
       load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
+      obs_agg[j, ] <- demand[test$id]
     }else{
       load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
+      obs_bottom[j, ] <- demand[test$id]
     }
-    obs_agg[j, ] <- demand[test$id]
+    
     
     for(idtest in seq(ntest)){
       
@@ -116,7 +117,8 @@ for(do.agg in c(TRUE, FALSE)){
   }# series
 }# AGG and BOTTOM
 
-stop("done")
+#stop("done")
+
 for(idtest in seq(ntest)){
   print(idtest)
   res_byidtest_file <- file.path(basef.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = ""))

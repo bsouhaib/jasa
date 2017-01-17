@@ -1,9 +1,26 @@
 rm(list = ls())
+args = (commandArgs(TRUE))
+if(length(args) == 0){
+  idjob <- 1
+  allidtest <- 1:1104
+}else{
+  
+  for(i in 1:length(args)){
+    print(args[[i]])
+  }
+  
+  idjob <- as.numeric(args[[1]])
+  allidtest <- NULL
+  for(i in seq(2, length(args))){
+    allidtest <- c(allidtest, as.numeric(args[[i]]))
+  }
+}
 source("config_paths.R")
 source("config_general.R")
 source("config_splitting.R")
 source("jasa_utils.R")
 source("utils.R")
+library(igraph)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
@@ -21,71 +38,95 @@ ordered_agg_nodes_names <- names(sort(depth_aggnodes))
 ordered_agg_nodes <- V(itree)[match(ordered_agg_nodes_names, V(itree)$name)]
 ##########
 
-alliseries <- seq(length(bottomSeries))
-algo.bottom <- algo <- "KD-IC-NML"
+#alliseries <- seq(length(bottomSeries))
+algo.bottom  <- "KD-IC-NML"
 algo.agg <- "TBATS"
+methods <- c("BASE", "NAIVEBU", "PERMBU")
 
 ntest <- length(test$id)
-allidtest <- seq(ntest)
+#allidtest <- seq(ntest)
+#list_results_agg_perm <- list_results_agg_naive <- list_results_agg_base <- list_obs_agg  <- vector("list", ntest)
 
-list_results_perm <- list_results_naive <- vector("list", ntest)
+list_crps <- vector("list", ntest)
 
 # Generate samples
 for(idtest in allidtest){
-  print(idtest)
-  print(base::date())
+  if(idtest%%48 == 0)
+  { 
+    print(idtest)
+    print(base::date())
+  }
   
   res_byidtest_file <- file.path(basef.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
   load(res_byidtest_file)
-  # "QF_agg_idtest", "QF_bottom_idtest", "PROB_bottom_idtest"
+  # "QF_agg_idtest", "QF_bottom_idtest", "PROB_bottom_idtest" "obs_agg_idtest", "obs_bottom_idtest"
   
   iday <- getInfo(idtest)$iday
   hour <- getInfo(idtest)$hour
   
-  Q <- matrix(NA, nrow = M, ncol = length(alliseries))
-  colnames(Q) <- bottomSeries[alliseries]
-  for(j in seq_along(alliseries)){
-    #if(j%%100 == 0)
-    #print(j)
-    
-    iseries <- alliseries[j]
-    idseries <- bottomSeries[iseries]
-    
-    #res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
-    #load(res_file)
-    
-    if(algo == "Uncond" || algo == "PeriodOfDay"){
-      invcdf <- approxfun(alphas, qFtest[, idtest], rule = 2)
-    }else if(algo == "TBATS"){	
-      
-      #invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
-    
-    }else if(algo == "KD-IC-NML"){	
-      
-      invcdf <- approxfun(PROB_bottom_idtest[, j], QF_bottom_idtest[, j], rule = 2)
-    
-    #  if(hour %in% hours_night){
-    #    index <- match(hour, hours_night)
-    #    qtauhat <- res_testing$res_nighthours[[iday]][[index]]$qtauhat
-    #    tauhat <- res_testing$res_nighthours[[iday]][[index]]$tauhat
-    #  }else{
-    #    index <- match(hour, hours_day)
-    #    qtauhat <- res_testing$res_dayhours[[iday]][[index]]$qtauhat
-    #    tauhat <- res_testing$res_dayhours[[iday]][[index]]$tauhat
-    #  }
-    #  invcdf <- approxfun(tauhat, qtauhat, rule = 2)
+  #Q <- matrix(NA, nrow = M, ncol = length(alliseries))
+  #colnames(Q) <- bottomSeries[alliseries]
+
+  for(do.agg in c(TRUE, FALSE)){
+    if(do.agg){
+      set_series <- aggSeries
+      algo <- algo.agg
+      base_samples_agg <- matrix(NA, nrow = M, ncol = length(set_series))
+      colnames(base_samples_agg) <- set_series
     }else{
-      stop("error")
+      set_series <- bottomSeries
+      algo <- algo.bottom
+      base_samples_bottom <- matrix(NA, nrow = M, ncol = length(set_series))
+      colnames(base_samples_bottom) <- set_series
     }
+    for(j in seq_along(set_series)){
+      #if(j%%100 == 0)
+      #print(j)
+      
+      #iseries <- alliseries[j]
+      idseries <- set_series[j]
+      
+      #res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
+      #load(res_file)
+      
+      if(algo == "Uncond" || algo == "PeriodOfDay"){
+        #invcdf <- approxfun(alphas, qFtest[, idtest], rule = 2)
+      }else if(algo == "TBATS"){	
+        invcdf <- approxfun(alphas, QF_agg_idtest[, j], rule = 2)
+        #invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
+      }else if(algo == "KD-IC-NML"){	
+        
+        invcdf <- approxfun(PROB_bottom_idtest[, j], QF_bottom_idtest[, j], rule = 2)
+      
+      #  if(hour %in% hours_night){
+      #    index <- match(hour, hours_night)
+      #    qtauhat <- res_testing$res_nighthours[[iday]][[index]]$qtauhat
+      #    tauhat <- res_testing$res_nighthours[[iday]][[index]]$tauhat
+      #  }else{
+      #    index <- match(hour, hours_day)
+      #    qtauhat <- res_testing$res_dayhours[[iday]][[index]]$qtauhat
+      #    tauhat <- res_testing$res_dayhours[[iday]][[index]]$tauhat
+      #  }
+      #  invcdf <- approxfun(tauhat, qtauhat, rule = 2)
+      }else{
+        stop("error")
+      }
+      
+      if(do.agg){
+        base_samples_agg[, j]    <- invcdf(q_probs)
+      }else{
+        base_samples_bottom[, j] <- invcdf(q_probs)
+      }
+      #Q[, j] <- invcdf(q_probs)
+    }# series
     
-    Q[, j] <- invcdf(q_probs)
-  }# series
+  }# agg and bottom
   
   # rank_X <- apply(Q, 2, rank, ties.method = "random")
   # I know that the rank of each observations is 1 --> M
-  samples <- Q
-  variables <- colnames(samples)
-  
+  perm_samples_bottom <- base_samples_bottom
+  variables <- colnames(perm_samples_bottom)
+
   mat_test <- NULL
   # PERM-BU
   for(inode in seq_along(ordered_agg_nodes)){
@@ -114,13 +155,13 @@ for(idtest in allidtest){
     # Extracting/computing the samples for each child
     if(length(columns_agg) > 0){
       id_agg_children  <- match(children_names[columns_agg], aggSeries)
-      samples_agg_children <- t(tcrossprod(Sagg[id_agg_children, , drop = F], samples))
+      samples_agg_children <- t(tcrossprod(Sagg[id_agg_children, , drop = F], perm_samples_bottom))
       samples_children[, columns_agg] <- samples_agg_children
     }
     
     if(length(columns_bottom) > 0){
       id_bottom_children  <- match(children_names[columns_bottom], bottomSeries)
-      samples_children[, columns_bottom] <- samples[, id_bottom_children]
+      samples_children[, columns_bottom] <- perm_samples_bottom[, id_bottom_children]
     }
     
     # Computing the ranks of the samples for each child
@@ -136,8 +177,8 @@ for(idtest in allidtest){
     
     # Permutating the rows
     if(length(columns_bottom) > 0){
-      samples[, id_bottom_children] <- sapply(seq_along(id_bottom_children), function(j){
-        samples[index_mat[, columns_bottom[j]], id_bottom_children[j]]
+      perm_samples_bottom[, id_bottom_children] <- sapply(seq_along(id_bottom_children), function(j){
+        perm_samples_bottom[index_mat[, columns_bottom[j]], id_bottom_children[j]]
       })
     }
     
@@ -146,27 +187,66 @@ for(idtest in allidtest){
         id <- which(Sagg[id_agg_children[j], ] == 1)
         #print(id)
         #print("---")
-        samples[index_mat[, columns_agg[j]], id, drop = F]
+        perm_samples_bottom[index_mat[, columns_agg[j]], id, drop = F]
       })
       ids <- lapply(id_agg_children, function(id_agg_child){
         which(Sagg[id_agg_child, ] == 1)
       })
       ids <- unlist(ids)
-      samples[, ids] <- do.call(cbind, res)
+      perm_samples_bottom[, ids] <- do.call(cbind, res)
     }
 
   }# agg node
   
   # PERM-BU
-  list_results_perm[[idtest]] <- samples_agg <- t(tcrossprod(Sagg, samples))
+  #list_results_agg_perm[[idtest]] <- perm_samples_agg <- t(tcrossprod(Sagg, perm_samples_bottom))
   
   # NAIVE-BU - shuffle the samples 
-  list_results_naive[[idtest]] <- samples_agg_naivebu <- t(tcrossprod(Sagg, apply(Q, 2, sample)))
-  stop("done")
+  #list_results_agg_naive[[idtest]] <- naivebu_samples_agg <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
+  
+  # BASE
+  #list_results_agg_base[[idtest]] <- base_samples_agg
+  
+  #list_obs_agg[[idtest]] <- obs_agg_idtest
+  
+  ###### MINT ############
+  
+  # samples_bottom + adjustments
+  # adjustments_all <- S %*% adjustments
+  
+  ########################
+  
+  allmethods_samples_agg <- array(NA, c(M, n_agg, length(methods)))
+  allmethods_samples_agg[, , match("BASE", methods)] <- base_samples_agg
+  allmethods_samples_agg[, , match("NAIVEBU", methods)] <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
+  allmethods_samples_agg[, , match("PERMBU", methods)] <- t(tcrossprod(Sagg, perm_samples_bottom))
+  
+  res <- sapply(seq_along(methods), function(imethod){
+    sapply(seq(n_agg), function(iagg){
+      crps_sampling(allmethods_samples_agg[, iagg, imethod], obs_agg_idtest[iagg])
+    })
+  })
+  colnames(res) <- methods
+  list_crps[[idtest]] <- res
 }
-
-# load data for all aggregates - obs_agg_idtest
-# Compute quantile scores and save them
-
+res_job <- file.path(loss.folder, "HTS", paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
+save(file = res_job, list = c("list_crps"))
 
 
+if(FALSE){
+  # load data for all aggregates - obs_agg_idtest
+  # Compute quantile scores and save them
+  savepdf(file.path(results.folder, paste("CDFPLOT", sep = "") ))
+  par(mfrow = c(2, 2))
+  for(iagg in seq(n_agg)){
+    for(idtest in seq(4)){
+      MAT <- cbind(sort(list_results_agg_perm[[idtest]][, iagg]), 
+                   sort(list_results_agg_naive[[idtest]][, iagg]),
+                   sort(list_results_agg_base[[idtest]][, iagg]),
+                   list_obs_agg[[idtest]][iagg])
+    matplot(x = MAT, y = seq(1, M)/M, pch = 1, cex = .5)
+    #abline(v = list_obs_agg[[idtest]][1])
+    }
+  }
+  dev.off()
+}

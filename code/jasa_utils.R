@@ -2,6 +2,16 @@
 #  2 * sqrt(varx) * dnorm(mux / sqrt(varx)) + mux * (2 * pnorm(mux / sqrt(varx)) - 1)
 #}
 
+mint_betastar <- function(W, y_hat){
+  MAT1 <- W %*% U
+  MAT2 <- crossprod(U,MAT1)
+  MAT3 <- tcrossprod(solve(MAT2), U)
+  C1 <- J %*% MAT1
+  C2 <- MAT3 %*% y_hat
+  adj <- C1 %*% C2
+  -adj
+}
+
 hasnoBottom <- function(algo){
   grepl("BU", algo) & !grepl("NNLS", algo) 
 }
