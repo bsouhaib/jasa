@@ -2,7 +2,7 @@ rm(list = ls())
 args = (commandArgs(TRUE))
 if(length(args) == 0){
   idjob <- 1
-  allidtest <- 1:48 #1:1104
+  allidtest <- 1:4 #1:1104
 }else{
   
   for(i in 1:length(args)){
@@ -253,7 +253,6 @@ for(idtest in allidtest){
   
   adj_bottom <- as.numeric(adj_bottom)
   adj_agg    <-  as.numeric(adj_agg)
-
   ########################
   
   agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "NAIVEBU-MINT", "PERMBU-MINT")
@@ -279,12 +278,13 @@ for(idtest in allidtest){
   samples_bot[, , match("BASE", bot_methods)] <- base_samples_bottom
   samples_bot[, , match("BASE-MINT", bot_methods)] <- t(t(base_samples_bottom) + adj_bottom)
   
+  # CRPS
   botmethods_crps <- compute_crps(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
   list_crps_bot[[idtest]] <- botmethods_crps
   
+  # QS
   qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
   sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
-  
 }
 
 avg_qscores_agg <- sum_overtest_qscores_agg/length(allidtest)
@@ -292,6 +292,7 @@ avg_qscores_bot <- sum_overtest_qscores_bot/length(allidtest)
 
 res_job <- file.path(loss.folder, "HTS", paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
 save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg", "avg_qscores_bot"))
+
 stop("FINISHED")
 
 
