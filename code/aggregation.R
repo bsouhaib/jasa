@@ -2,7 +2,7 @@ rm(list = ls())
 args = (commandArgs(TRUE))
 if(length(args) == 0){
   idjob <- 1
-  allidtest <- 1:1104
+  allidtest <- 1:48 #1:1104
 }else{
   
   for(i in 1:length(args)){
@@ -22,7 +22,44 @@ source("jasa_utils.R")
 source("utils.R")
 library(igraph)
 
+set.seed(1986)
+
+compute_crps <- function(methods, n, mat_samples, observations){
+  res <- sapply(seq_along(methods), function(imethod){
+    sapply(seq(n), function(i){
+      crps_sampling(mat_samples[, i, imethod], observations[i])
+    })
+  })
+  colnames(res) <- methods
+  res
+}
+
+compute_qscores <- function(methods, n, mat_samples, observations){
+  sorted_samples <- apply(mat_samples, c(2, 3), sort)
+  qscores <- sapply(seq(n), function(i){
+    obs <- observations[i]
+    sapply(seq_along(methods), function(imethod){
+      sapply(seq(length(q_probs)), function(iprob){
+        qf <- sorted_samples[iprob, i, imethod]
+        2 * ((obs <= qf) - q_probs[iprob]) * (qf - obs)
+      })
+    })
+  }, simplify = 'array')
+  qscores
+}
+
+
 load(file.path(work.folder, "myinfo.Rdata"))
+n_bottom <- length(bottomSeries)
+
+algo.bottom  <- "KD-IC-NML"
+algo.agg <- "TBATS"
+
+covmethod <- c("shrink")
+W1file <- file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", covmethod, ".Rdata", sep = "")) 
+load(W1file)
+J <- Matrix(cbind(matrix(0, nrow = n_bottom, ncol = n_agg), diag(n_bottom)), sparse = TRUE)
+U <- Matrix(rbind(diag(n_agg), -t(Sagg)), sparse = TRUE)
 
 ##########
 # compute the parsing order of the aggregate nodes
@@ -39,23 +76,20 @@ ordered_agg_nodes <- V(itree)[match(ordered_agg_nodes_names, V(itree)$name)]
 ##########
 
 #alliseries <- seq(length(bottomSeries))
-algo.bottom  <- "KD-IC-NML"
-algo.agg <- "TBATS"
-methods <- c("BASE", "NAIVEBU", "PERMBU")
-
 ntest <- length(test$id)
 #allidtest <- seq(ntest)
 #list_results_agg_perm <- list_results_agg_naive <- list_results_agg_base <- list_obs_agg  <- vector("list", ntest)
 
-list_crps <- vector("list", ntest)
-
+list_crps_agg <- list_crps_bot <- list_qscores_agg <- vector("list", ntest)
+sum_overtest_qscores_agg <- sum_overtest_qscores_bot <- 0
 # Generate samples
 for(idtest in allidtest){
-  if(idtest%%48 == 0)
-  { 
-    print(idtest)
-    print(base::date())
-  }
+  print(idtest)
+  #if(idtest%%48 == 0)
+  #{ 
+  #  print(idtest)
+  #  print(base::date())
+  #}
   
   res_byidtest_file <- file.path(basef.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
   load(res_byidtest_file)
@@ -210,29 +244,59 @@ for(idtest in allidtest){
   #list_obs_agg[[idtest]] <- obs_agg_idtest
   
   ###### MINT ############
+  #  adjustments 
+  b_hat <- apply(base_samples_bottom, 2, mean)
+  a_hat <- apply(base_samples_agg, 2, mean)
+  y_hat <- c(a_hat, b_hat)
+  adj_bottom <- mint_betastar(W1, y_hat = y_hat)
+  adj_agg    <- Sagg %*% adj_bottom
   
-  # samples_bottom + adjustments
-  # adjustments_all <- S %*% adjustments
-  
+  adj_bottom <- as.numeric(adj_bottom)
+  adj_agg    <-  as.numeric(adj_agg)
+
   ########################
   
-  allmethods_samples_agg <- array(NA, c(M, n_agg, length(methods)))
-  allmethods_samples_agg[, , match("BASE", methods)] <- base_samples_agg
-  allmethods_samples_agg[, , match("NAIVEBU", methods)] <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
-  allmethods_samples_agg[, , match("PERMBU", methods)] <- t(tcrossprod(Sagg, perm_samples_bottom))
+  agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "NAIVEBU-MINT", "PERMBU-MINT")
+  samples_agg <- array(NA, c(M, n_agg, length(agg_methods)))
+  samples_agg[, , match("BASE", agg_methods)] <- base_samples_agg
+  samples_agg[, , match("NAIVEBU", agg_methods)] <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
+  samples_agg[, , match("PERMBU", agg_methods)] <- t(tcrossprod(Sagg, perm_samples_bottom))
   
-  res <- sapply(seq_along(methods), function(imethod){
-    sapply(seq(n_agg), function(iagg){
-      crps_sampling(allmethods_samples_agg[, iagg, imethod], obs_agg_idtest[iagg])
-    })
-  })
-  colnames(res) <- methods
-  list_crps[[idtest]] <- res
+  samples_agg[, , match("NAIVEBU-MINT", agg_methods)] <- t(t(samples_agg[, , match("NAIVEBU", agg_methods)]) + adj_agg)
+  samples_agg[, , match("PERMBU-MINT", agg_methods)]  <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg)
+  
+  # CRPS
+  aggmethods_crps <- compute_crps(agg_methods, n_agg, samples_agg, obs_agg_idtest)
+  list_crps_agg[[idtest]] <- aggmethods_crps
+  
+  # QS
+  qscores_agg <- compute_qscores(agg_methods, n_agg, samples_agg, obs_agg_idtest)
+  sum_overtest_qscores_agg <- sum_overtest_qscores_agg + qscores_agg
+    
+  ### BOTTOM
+  bot_methods <- c("BASE", "BASE-MINT")
+  samples_bot <- array(NA, c(M, n_bottom, length(bot_methods)))
+  samples_bot[, , match("BASE", bot_methods)] <- base_samples_bottom
+  samples_bot[, , match("BASE-MINT", bot_methods)] <- t(t(base_samples_bottom) + adj_bottom)
+  
+  botmethods_crps <- compute_crps(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
+  list_crps_bot[[idtest]] <- botmethods_crps
+  
+  qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
+  sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
+  
 }
+
+avg_qscores_agg <- sum_overtest_qscores_agg/length(allidtest)
+avg_qscores_bot <- sum_overtest_qscores_bot/length(allidtest)
+
 res_job <- file.path(loss.folder, "HTS", paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
-save(file = res_job, list = c("list_crps"))
+save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg", "avg_qscores_bot"))
+stop("FINISHED")
 
 
+
+##############################################
 if(FALSE){
   # load data for all aggregates - obs_agg_idtest
   # Compute quantile scores and save them
@@ -249,4 +313,36 @@ if(FALSE){
     }
   }
   dev.off()
+}
+
+iagg <- 10
+v <- lapply(seq(393), function(idtest){
+  list_qscores_agg[[idtest]][, , iagg]
+})
+vv <- Reduce("+", v)/393
+matplot(x = seq(1, M)/M, y = vv, col = c("black", "red", "blue", "orange", "darkblue"))
+abline(v = 0.5)
+
+
+temp <- Reduce("+", list_qscores_agg[seq(300)])
+
+
+#list_qscores_agg[[idtest]] <- qscores
+
+#comparing with CRPS
+#res2 <- apply(qscores, c(2, 3), sum)/length(q_probs)
+
+par(mfrow = c(2, 2))
+for(iagg in c(1, 10)){
+  matplot(y = qscores[, , iagg], x = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "red", "blue", "orange", "darkblue"))
+  MAT <- cbind(sorted_samples_agg[, iagg,], obs_agg_idtest[iagg])
+  matplot(x = MAT, y = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "red", "blue", "orange", "darkblue"))
+}
+
+par(mfrow = c(2, 2))
+for(i in c(100)){
+  matplot(y = sum_overtest_qscores_bot[, , i], x = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "magenta"))
+  sorted_samples_bot <- apply(samples_bot, c(2, 3), sort)
+  MAT <- cbind(sorted_samples_bot[, i,], obs_bottom_idtest[i])
+  matplot(x = MAT, y = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "magenta"))
 }

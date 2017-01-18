@@ -8,17 +8,18 @@ source("utils.R")
 load(file.path(work.folder, "myinfo.Rdata"))
 
 do.agg <- TRUE
-alliseries <- c(1, 2)
+alliseries <- c(14)
 
-mymfrow <- c(3, 2); idays <- seq(1, 91, by = 20)
+#mymfrow <- c(3, 2); 
+idays <- seq(1, 92, by = 1)
 tag <- "TAG"; 
-algorithms <- c("KD-IC-NML")
+algorithms <- c("KD-IC-NML", "TBATS")
 only.future <- FALSE
 
-savepdf(file.path(results.folder, paste("JASA_forecasts_ALL", tag, sep = "") ))
+savepdf(file.path(results.folder, paste("PLOT_forecasts_ALL", tag, sep = "") ))
 
 for(iseries in alliseries){
-  #savepdf(file.path(results.folder, paste("JASA_forecasts_", iseries, "_", tag, sep = "") ))
+  #savepdf(file.path(results.folder, paste("PLOT_forecasts_", iseries, "_", tag, sep = "") ))
   
   print(iseries)
   if(do.agg){
@@ -55,7 +56,7 @@ for(iseries in alliseries){
     }
     ######
   }
-  
+  par(mfrow = c(2, 2))
   list_load <- vector("list", length(algorithms))
   for(ialgo in seq_along(algorithms)){
     
@@ -72,7 +73,7 @@ for(iseries in alliseries){
     }else if(algo_load == "Uncond"){
       list_load[[ialgo]] <- list(qFtest = qFtest, mFtest = mFtest)
     }
-  }
+  }#algo
   
   
   for(iday in idays){

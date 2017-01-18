@@ -5,8 +5,8 @@ rscript="basef.R"
 doagg=TRUE
 #doagg=FALSE
 
-#algo="KD-IC-NML"
-algo="TBATS"
+algo="KD-IC-NML"
+#algo="TBATS"
 
 
 if [[ "$doagg" -eq "TRUE" ]]; then
