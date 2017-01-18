@@ -12,20 +12,44 @@ algo.agg <- "TBATS"
 algo.bottom  <- "KD-IC-NML"
 
 ntest <- length(test$id)
+n_bottom <- length(bottomSeries)
 
-methods <- c("BASE", "NAIVEBU", "PERMBU")
+nbperjob <- 276
+njobs <- ntest/nbperjob
 
-allmethods_samples_agg <- array(NA, c(n_agg, ntest, length(methods)))
-for(idjob in 1:4){
+crps_agg    <- array(NA, c(n_agg, ntest, 5))
+crps_bottom <- array(NA, c(n_bottom, ntest, 2))
+
+total_qscores_agg <- total_qscores_bot <- 0
+
+for(idjob in seq(njobs)){
+  allidtest <- (idjob - 1) * nbperjob + seq(nbperjob) 
+  
   res_job <- file.path(loss.folder, "HTS", paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
   load(res_job)
   
-  list_crps <- list_crps[-which(sapply(list_crps, is.null))]
-  mat_res <- sapply(seq_along(list_crps),  function(i){list_crps[[i]]}, simplify = 'array')
+  list_crps_agg_nonull <- list_crps_agg[-which(sapply(list_crps_agg, is.null))]
+  mat_crps_agg <- sapply(seq_along(list_crps_agg_nonull),  function(i){list_crps_agg_nonull[[i]]}, simplify = 'array')
   
-  allidtest <- (idjob - 1) * 1104 + seq(1104) 
-  allmethods_samples_agg[, allidtest, ] <-  aperm(mat_res, c(1, 3, 2))
+  list_crps_bot_nonull <- list_crps_bot[-which(sapply(list_crps_bot, is.null))]
+  mat_crps_bot <- sapply(seq_along(list_crps_bot_nonull),  function(i){list_crps_bot_nonull[[i]]}, simplify = 'array')
+  
+  #allmethods_samples_agg[, allidtest, ] <-  aperm(mat_res, c(1, 3, 2))
+  
+  crps_agg[, allidtest,]     <- aperm(mat_crps_agg, c(1, 3, 2))
+  crps_bottom[, allidtest, ] <- aperm(mat_crps_bot, c(1, 3, 2))
+  total_qscores_agg <- total_qscores_agg + avg_qscores_agg
+  total_qscores_bot <- total_qscores_bot + avg_qscores_bot
+
 }
+
+total_qscores_agg <- total_qscores_agg / njobs
+total_qscores_bot <- total_qscores_bot / njobs
+
+# crps_agg   total_qscores_agg
+# crps_bottom total_qscores_bot
+
+stop("done")
 
 # COMPUTE BOOTSTRAPPED STANDARD ERROR
 

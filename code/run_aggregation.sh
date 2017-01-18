@@ -11,7 +11,7 @@ do
   allidtest=( $(seq $start $end ) )
   
   echo "${allidtest[@]}"
-  Rscript --vanilla $rscript $1 ${allidtest[@]} > "/home/rstudio/PROJ/rout/aggregation-$1.Rout" 2> "/home/rstudio/PROJ/rout/aggregation-$1.err" &
+  Rscript --vanilla $rscript $ijob ${allidtest[@]} > "/home/rstudio/PROJ/rout/aggregation-$ijob.Rout" 2> "/home/rstudio/PROJ/rout/aggregation-$ijob.err" &
 done
 
 

@@ -21,6 +21,7 @@ source("config_splitting.R")
 source("jasa_utils.R")
 source("utils.R")
 library(igraph)
+library(Matrix)
 
 set.seed(1986)
 
