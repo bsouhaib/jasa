@@ -4,10 +4,10 @@ args = (commandArgs(TRUE))
 if(length(args) == 0){
   #hierarchy <- "geo"
   #ncores <- 2
-  #algo <- c("KD-IC-NML")
-  algo <- c("TBATS")
+  algo <- c("KD-IC-NML")
+  #algo <- c("TBATS")
 
-  do.agg <- TRUE
+  do.agg <- F
   alliseries <- 1
   #do.agg <- FALSE
   #alliseries <- 10
@@ -135,11 +135,35 @@ for(iseries in alliseries){
     
     ### RESIDUALS
     #print("residuals")
-    res_residuals <- predictkde("residuals", 
-                              bandwiths_nighthours = bandwiths_nighthours_best, 
-                              bandwiths_dayhours = bandwiths_dayhours_best)
+    #res_residuals <- predictkde("residuals", 
+     #                         bandwiths_nighthours = bandwiths_nighthours_best, 
+      #                        bandwiths_dayhours = bandwiths_dayhours_best)
     
-    save(file = res_file, list = c("res_learning", "res_testing", "res_residuals"))
+    res_insample_info <- predictkde("insample_info", 
+                                bandwiths_nighthours = bandwiths_nighthours_best, 
+                                bandwiths_dayhours = bandwiths_dayhours_best)
+    
+    stop("done")
+    # res_insample_info$res_nighthours[[ day ]][[hour]]$crps
+    res_residuals <- res_insample_info
+    # keep only residuals
+    # RIGHT FORMAT: e_residuals as in TBATS
+    # save in file
+    
+    res_insample_quantiles <- res_insample_info
+    # keep only quantiles info
+    # save in file
+    
+    # PUT THE RESULTS IN THE RIGHT FORMAT HERE !!!!
+    # all_qf <- all_mf <- all_sd <- vector("list", nb_futuredays) as in TBATS
+    
+    # update permutation code
+    # update basef_byidtest
+    # update aggregation code
+    
+    # do not save res_learning 
+    
+    save(file = res_file, list = c("res_learning", "res_testing"))
   }else if(algo %in% c("TBATS", "BATS")){
     
     only.resid <- FALSE
@@ -222,7 +246,7 @@ for(iseries in alliseries){
     }
     
     for(id_future_day in mydays){
-      #print(id_future_day)
+      print(id_future_day)
       #print(base::date())
 
       if(id_future_day == 1){
@@ -253,7 +277,7 @@ for(iseries in alliseries){
         seasonal.periods <- c(336) # c(48) !!!!!!!!!!!!!!!!!!!
       }
      
-      do.logtrans <- T
+      do.logtrans <- F
       if(do.logtrans){
         my_ts <- log(y)	     
       }else{

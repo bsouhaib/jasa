@@ -8,7 +8,7 @@ source("utils.R")
 load(file.path(work.folder, "myinfo.Rdata"))
 
 do.agg <- TRUE
-alliseries <- c(14)
+alliseries <- c(1)
 
 #mymfrow <- c(3, 2); 
 idays <- seq(1, 92, by = 1)

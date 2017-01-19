@@ -48,7 +48,7 @@ crps_sampling <- function(X, obs){
   mean(abs(X - obs)) - 0.5 * mean(abs(Xprime))
 }
 
-kde <- function(id_query, ids_data, bandwiths, only.mean = FALSE){
+kde <- function(id_query, ids_data, bandwiths, task){
   #print(id_query)
   ####
   if(algo == "KD-U"){
@@ -113,7 +113,7 @@ kde <- function(id_query, ids_data, bandwiths, only.mean = FALSE){
       # apply(bumps, 2, function(b){ matplot(xgrid, bumps, lty = 1, type = 'n'); lines(xgrid, b)})
     }
     #########
-    if(!only.mean){
+    
       cdfs <- sapply(seq(length(x)), function(i){ 	
         xi <- x[i]		
         if(mykernel == "normal"){
@@ -126,7 +126,7 @@ kde <- function(id_query, ids_data, bandwiths, only.mean = FALSE){
         }
       })
       cdf <- rowSums(cdfs)
-    }
+    
     #browser()
     
     # Mean forecasts 
@@ -173,7 +173,7 @@ kde <- function(id_query, ids_data, bandwiths, only.mean = FALSE){
     #}
     #crps[i] <- integrate(integrand, min(xgrid), max(xgrid))$value
     
-    if(!only.mean){
+    if(task != "insample_info"){
       if(mykernel == "normal"){
         crps[i] <- crps_mixture(x, vech, obs)
       }else{
@@ -210,22 +210,22 @@ kde <- function(id_query, ids_data, bandwiths, only.mean = FALSE){
   #browser()
   
   
-  if(length(bandwiths) == 1){ # TESTING
-    if(!only.mean){
+  if(task == "learning"){
+    ret <- list(crps = crps)
+  }else if(task == "testing"){
       ret <- list(crps = crps, squared_error = squared_error, qtauhat = xgrid, tauhat = cdf, mu_hat = mu_hat, var_hat = var_hat)
-    }else{
-      ret <- list(residuals = residuals, squared_error = squared_error, mu_hat = mu_hat, var_hat = var_hat)
-    }
-  }else{ # LEARNING
-    ret <- list(crps = crps, squared_error = squared_error, qtauhat = NULL, tauhat = NULL, mu_hat = mu_hat, var_hat = var_hat)
+  }else if(task == "insample_info"){
+      ret <- list(residuals = residuals, qtauhat = xgrid, tauhat = cdf)
+   }else{
+      stop("ERROR ...")
   }
-  
+  ret
 }
 
-predictkde <- function(task = c("learning", "testing", "residuals"), bandwiths_nighthours = NULL, bandwiths_dayhours = NULL){
+predictkde <- function(task = c("learning", "testing", "insample_info"), bandwiths_nighthours = NULL, bandwiths_dayhours = NULL){
   
   n_past_obs <- n_past_obs_kd
-  onlymean <- FALSE
+  
   if(task == "learning"){
     
     #ids_past   <- train$id
@@ -286,13 +286,10 @@ predictkde <- function(task = c("learning", "testing", "residuals"), bandwiths_n
     ids_future <- test$id
     
     nb_futuredays <- length(seq_testing_interval)/48
-  }else if(task == "residuals"){
+  }else if(task == "insample_info"){
     ids_past   <- head(learn$id, n_past_obs)
     ids_future <- tail(learn$id, -n_past_obs)
-    
     nb_futuredays <- length(ids_future)/48
-    
-    onlymean <- TRUE
     #browser()
   }
   
@@ -323,15 +320,15 @@ predictkde <- function(task = c("learning", "testing", "residuals"), bandwiths_n
      
     
     # 48-hours ahead forecasts
-    res_nighthours[[id_future_day]] <- lapply(ids_future_nighthours, function(id){kde(id, ids_past_actual, bandwiths_nighthours, onlymean)})
-    res_dayhours[[id_future_day]] <- lapply(ids_future_dayhours, function(id){kde(id, ids_past_actual, bandwiths_dayhours, onlymean)})	
+    res_nighthours[[id_future_day]] <- lapply(ids_future_nighthours, function(id){kde(id, ids_past_actual, bandwiths_nighthours, task)})
+    res_dayhours[[id_future_day]] <- lapply(ids_future_dayhours, function(id){kde(id, ids_past_actual, bandwiths_dayhours, task)})	
   }	
   
   list(res_nighthours = res_nighthours, res_dayhours = res_dayhours, 
        bandwiths_nighthours = bandwiths_nighthours, bandwiths_dayhours = bandwiths_dayhours)
 }
 
-getfromlist <- function(mylist, item = c("crps", "squared_error", "qtauhat", "tauhat", "mu_hat")){
+getfromlist <- function(mylist, item = c("crps", "residuals", "squared_error", "qtauhat", "tauhat", "mu_hat")){
   sapply(mylist, function(daylist){
     sapply(daylist, function(hourlist){
       hourlist[[item]]
