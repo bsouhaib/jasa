@@ -77,20 +77,12 @@ for(do.agg in c(TRUE, FALSE)){
       hour <- getInfo(idtest)$hour
       
       if(algo == "Uncond" || algo == "PeriodOfDay"){
-        invcdf <- approxfun(alphas, qFtest[, idtest], rule = 2)
+        #invcdf <- approxfun(alphas, qFtest[, idtest], rule = 2)
       }else if(algo == "TBATS"){	
-        invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
+        #invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
       }else if(algo == "KD-IC-NML"){	
-        if(hour %in% hours_night){
-          index <- match(hour, hours_night)
-          qtauhat <- res_testing$res_nighthours[[iday]][[index]]$qtauhat
-          tauhat <- res_testing$res_nighthours[[iday]][[index]]$tauhat
-        }else{
-          index <- match(hour, hours_day)
-          qtauhat <- res_testing$res_dayhours[[iday]][[index]]$qtauhat
-          tauhat <- res_testing$res_dayhours[[iday]][[index]]$tauhat
-        }
-        #invcdf <- approxfun(tauhat, qtauhat, rule = 2)
+        tauhat  <- all_tau[[iday]][, hour]
+        qtauhat <- all_qf[[iday]][, hour]
       }else{
         stop("error")
       }

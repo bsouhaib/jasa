@@ -23,31 +23,11 @@ for(inode in seq_along(agg_nodes)){
       isbottom <- (child_node %in% leaves)
       idseries <- names(child_node)
       if(isbottom){
-        res_file <- file.path(basef.folder, "KD-IC-NML", paste("results_", idseries, "_", "KD-IC-NML", ".Rdata", sep = "")) 
-        load(res_file)
-        e_residuals <- sapply(tail(learn$id, -n_past_obs_kd), function(id){
-          #print(id)
-          #if(id == 15169)
-          #  browser()
-          
-          iday <- getInfo(id)$iday
-          iday <- iday - n_past_obs_kd/48
-          
-          hour <- getInfo(id)$hour
-          #browser()
-          if(hour %in% hours_night){
-            index <- match(hour, hours_night)
-            residhat <- res_residuals$res_nighthours[[iday]][[index]]$residuals
-          }else{
-            index <- match(hour, hours_day)
-            residhat <- res_residuals$res_dayhours[[iday]][[index]]$residuals
-          }
-          residhat
-        })
+        resid_file <- file.path(insample.folder, "KD-IC-NML", paste("residuals_", idseries, "_", "KD-IC-NML", ".Rdata", sep = "")) 
+        load(resid_file)
         e_residuals <- c(rep(NA, n_past_obs_kd), e_residuals)
-
       }else{
-        resid_file <- file.path(residuals.folder, "TBATS", paste("residuals_", idseries, "_", "TBATS", "_", 1, ".Rdata", sep = "")) 
+        resid_file <- file.path(insample.folder, "TBATS", paste("residuals_", idseries, "_", "TBATS", "_", 1, ".Rdata", sep = "")) 
         load(resid_file)
         #e_residuals
       }

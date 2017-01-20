@@ -328,10 +328,29 @@ predictkde <- function(task = c("learning", "testing", "insample_info"), bandwit
        bandwiths_nighthours = bandwiths_nighthours, bandwiths_dayhours = bandwiths_dayhours)
 }
 
-getfromlist <- function(mylist, item = c("crps", "residuals", "squared_error", "qtauhat", "tauhat", "mu_hat")){
+getfromlist <- function(mylist, item = c("crps", "residuals", "squared_error", "qtauhat", "tauhat", "mu_hat", "var_hat")){
   sapply(mylist, function(daylist){
     sapply(daylist, function(hourlist){
       hourlist[[item]]
     }, simplify = "array")
   }, simplify = "array")
+}
+
+getItem <- function(mylist, item, order_hours){
+    item_night <- getfromlist(mylist$res_nighthours, item)
+    item_day   <- getfromlist(mylist$res_dayhours, item)
+    if(length(dim(item_night)) == 3){
+      item_all <- abind(item_night, item_day, along = 2)
+      item_all <- item_all[, order_hours, ]
+      res <- lapply(seq(dim(item_all)[3]), function(iday){
+        item_all[, , iday]
+      })
+    }else if(length(dim(item_night)) == 2){
+      item_all <- rbind(item_night, item_day)
+      item_all <- item_all[order_hours, ]
+      res <- lapply(seq(ncol(item_all)), function(iday){
+        item_all[, iday]
+      })
+    }
+    res
 }

@@ -130,19 +130,7 @@ for(idtest in allidtest){
         invcdf <- approxfun(alphas, QF_agg_idtest[, j], rule = 2)
         #invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
       }else if(algo == "KD-IC-NML"){	
-        
         invcdf <- approxfun(PROB_bottom_idtest[, j], QF_bottom_idtest[, j], rule = 2)
-      
-      #  if(hour %in% hours_night){
-      #    index <- match(hour, hours_night)
-      #    qtauhat <- res_testing$res_nighthours[[iday]][[index]]$qtauhat
-      #    tauhat <- res_testing$res_nighthours[[iday]][[index]]$tauhat
-      #  }else{
-      #    index <- match(hour, hours_day)
-      #    qtauhat <- res_testing$res_dayhours[[iday]][[index]]$qtauhat
-      #    tauhat <- res_testing$res_dayhours[[iday]][[index]]$tauhat
-      #  }
-      #  invcdf <- approxfun(tauhat, qtauhat, rule = 2)
       }else{
         stop("error")
       }

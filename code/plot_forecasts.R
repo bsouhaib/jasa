@@ -7,13 +7,14 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-do.agg <- TRUE
-alliseries <- c(1)
+do.agg <- FALSE
+alliseries <- c(130)
 
 #mymfrow <- c(3, 2); 
 idays <- seq(1, 92, by = 1)
 tag <- "TAG"; 
-algorithms <- c("KD-IC-NML", "TBATS")
+#algorithms <- c("KD-IC-NML", "TBATS")
+algorithms <- c("KD-IC-NML")
 only.future <- FALSE
 
 savepdf(file.path(results.folder, paste("PLOT_forecasts_ALL", tag, sep = "") ))
@@ -67,7 +68,7 @@ for(iseries in alliseries){
     load(res_file)
 
     if(algo_load == "KD-IC-NML"){
-      list_load[[ialgo]] <- res_testing
+      list_load[[ialgo]] <- list(all_qf = all_qf, all_tau = all_tau, all_mf = all_mf) #res_testing
     }else if(algo_load == "TBATS"){
       list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf)
     }else if(algo_load == "Uncond"){
@@ -82,72 +83,33 @@ for(iseries in alliseries){
       
       algo <- algorithms[ialgo]
       algo_load <- algo
-
-      if(algo_load == "KD-IC-NML"){
-        res_testing <- list_load[[ialgo]] 
-        
-        res <- lapply(seq(48), function(hour){
-          if(hour %in% hours_night){
-            index <- match(hour, hours_night)
-            qtauhat <- res_testing$res_nighthours[[iday]][[index]]$qtauhat
-            tauhat <- res_testing$res_nighthours[[iday]][[index]]$tauhat
-            muhat <- res_testing$res_nighthours[[iday]][[index]]$mu_hat
-          }else{
-            index <- match(hour, hours_day)
-            qtauhat <- res_testing$res_dayhours[[iday]][[index]]$qtauhat
-            tauhat <- res_testing$res_dayhours[[iday]][[index]]$tauhat
-            muhat <- res_testing$res_dayhours[[iday]][[index]]$mu_hat
-          }
-          invcdf <- approxfun(tauhat, qtauhat, rule = 2)
-          
-          qf <- invcdf(alphas)
-          list(qf = qf, muhat = muhat)
-        })
-        qf_allhours <- sapply(res, "[[", "qf")
-        mu_hat <- matrix(NA, nrow = 92, ncol = 48)
-        mu_hat[iday, ] <- sapply(res, "[[", "muhat")
-        
-      }else if(algo_load == "TBATS"){
+      
+      if(algo_load == "KD-IC-NML" || algo_load == "TBATS"){
         
         all_qf <- list_load[[ialgo]]$all_qf
         all_mf <- list_load[[ialgo]]$all_mf
-        
-        qf_allhours <- sapply(seq(48), function(hour){
-          qf <- all_qf[[iday]][, hour]
-        })
         mu_hat <- matrix(unlist(all_mf), ncol = 48, byrow = T)
         
+        if(algo_load == "KD-IC-NML"){
+          all_tau <- list_load[[ialgo]]$all_tau
+          
+          qf_allhours <- sapply(seq(48), function(hour){
+            invcdf <- approxfun(all_tau[[iday]][, hour], all_qf[[iday]][, hour], rule = 2)
+            qf <- invcdf(alphas)
+            qf
+          })
+        
+        }else if(algo_load == "TBATS"){
+          qf_allhours <- sapply(seq(48), function(hour){
+            qf <- all_qf[[iday]][, hour]
+          })
+        }
       }else if(algo_load == "Uncond"){
         qFtest <- list_load[[ialgo]]$qFtest
         mFtest <- list_load[[ialgo]]$mFtest
         
         qf_allhours <- qFtest
         mu_hat <- matrix(mFtest, ncol = 48, byrow = T)
-      }else if(grepl("BU-INDEP-", algo_load) || grepl("BU-PERM-", algo_load)|| grepl("NNLS", algo_load)){
-        
-        allidtest <- (iday - 1) * 48 + seq(48) 
-        
-        qf_allhours <- matrix(NA, nrow = length(alphas), ncol = 48)
-        mu_hat <- matrix(NA, nrow = 92, ncol = 48)
-        for(ii in seq_along(allidtest)){
-          idtest <- allidtest[ii]
-          idtest_res_file <- file.path(forecasts.folder, algo_load, 
-                                       paste("results_", hierarchy, "_", algo_load, "_", idtest, ".Rdata", sep = "")) 
-          load(idtest_res_file)
-          
-          if(grepl("NNLS", algo_load)){
-            myQF <- qF[, iseries]
-            myMF <- mF[iseries]
-          }else{
-            myQF <- qFagg[, iseries]
-            myMF <- mFagg[iseries]
-          }
-          
-          qf_allhours[, ii] <- myQF
-          mu_hat[iday, ii] <- myMF
-          
-        }
-        
       }
 
       rownames(qf_allhours) <- paste(alphas*100, "%", sep = "")

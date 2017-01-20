@@ -8,7 +8,7 @@ if(length(args) == 0){
   #algo <- c("TBATS")
 
   do.agg <- F
-  alliseries <- 1
+  alliseries <- 130
   #do.agg <- FALSE
   #alliseries <- 10
   
@@ -47,6 +47,7 @@ library(fBasics)
 library(msm)
 library(gtools)
 library(forecast)
+library(abind)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
@@ -110,8 +111,8 @@ for(iseries in alliseries){
     }
     
     #print(mykernel)
+    
     ### LEARNING
-    #print("learning")
     res_learning <- predictkde("learning")
     
     # Best bandwith for dayhours
@@ -126,44 +127,41 @@ for(iseries in alliseries){
     id_best_nighthours <- which.min(avg_crps_nighthours)
     bandwiths_nighthours_best <- res_learning$bandwiths_nighthours[id_best_nighthours]
     
+    # I DO NOT SAVE LEARNING INFORMATION
     
     ### TESTING
-    #print("testing")
     res_testing <- predictkde("testing", 
                               bandwiths_nighthours = bandwiths_nighthours_best, 
                               bandwiths_dayhours = bandwiths_dayhours_best)
     
-    ### RESIDUALS
-    #print("residuals")
-    #res_residuals <- predictkde("residuals", 
-     #                         bandwiths_nighthours = bandwiths_nighthours_best, 
-      #                        bandwiths_dayhours = bandwiths_dayhours_best)
+    order_hours <- match(seq(48), c(hours_night, hours_day))
     
+    # CRPS
+    # all_crps <- getItem(res_testing, "crps", order_hours)
+    all_qf  <- getItem(res_testing, "qtauhat", order_hours)
+    all_tau <- getItem(res_testing, "tauhat", order_hours)
+    all_mf  <- getItem(res_testing, "mu_hat", order_hours)
+    
+    save(file = res_file, list = c("all_qf", "all_tau", "all_mf"))
+    
+    ### IN SAMPLE
     res_insample_info <- predictkde("insample_info", 
                                 bandwiths_nighthours = bandwiths_nighthours_best, 
                                 bandwiths_dayhours = bandwiths_dayhours_best)
+
+    # residuals
+    all_residuals <- getItem(res_insample_info, "residuals", order_hours)
+    e_residuals <- unlist(all_residuals)
+    dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
+    resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, ".Rdata", sep = "")) 
+    save(file = resid_file, list = c("e_residuals"))
     
-    stop("done")
-    # res_insample_info$res_nighthours[[ day ]][[hour]]$crps
-    res_residuals <- res_insample_info
-    # keep only residuals
-    # RIGHT FORMAT: e_residuals as in TBATS
-    # save in file
+    # extract cdfs
+    all_qf  <- getItem(res_insample_info, "qtauhat", order_hours)
+    all_tau <- getItem(res_insample_info, "tauhat", order_hours)
+    insamplecdf_file <- file.path(insample.folder, algo, paste("insamplecdf_", idseries, "_", algo, ".Rdata", sep = "")) 
+    save(file = insamplecdf_file, list = c("all_qf", "all_tau"))
     
-    res_insample_quantiles <- res_insample_info
-    # keep only quantiles info
-    # save in file
-    
-    # PUT THE RESULTS IN THE RIGHT FORMAT HERE !!!!
-    # all_qf <- all_mf <- all_sd <- vector("list", nb_futuredays) as in TBATS
-    
-    # update permutation code
-    # update basef_byidtest
-    # update aggregation code
-    
-    # do not save res_learning 
-    
-    save(file = res_file, list = c("res_learning", "res_testing"))
   }else if(algo %in% c("TBATS", "BATS")){
     
     only.resid <- FALSE
@@ -303,8 +301,8 @@ for(iseries in alliseries){
       
       if(id_future_day == 1)
       {
-        dir.create(file.path(residuals.folder, algo), recursive = TRUE, showWarnings = FALSE)
-        resid_file <- file.path(residuals.folder, algo, paste("residuals_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+        dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
+        resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
         save(file = resid_file, list = c("e_residuals"))
       } 
       
