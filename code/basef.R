@@ -4,11 +4,12 @@ args = (commandArgs(TRUE))
 if(length(args) == 0){
   #hierarchy <- "geo"
   #ncores <- 2
-  algo <- c("KD-IC-NML")
+  #algo <- c("KD-IC-NML")
   #algo <- c("TBATS")
-
-  do.agg <- F
-  alliseries <- 130
+  algo <- "DYNREG"
+    
+  do.agg <- T
+  alliseries <- 1
   #do.agg <- FALSE
   #alliseries <- 10
   
@@ -48,10 +49,11 @@ library(msm)
 library(gtools)
 library(forecast)
 library(abind)
+library(glmnet)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-algos_allowed <- c("Uncond", "KD-IC-TRC", "KD-IC-NML", "TBATS", "BATS")
+algos_allowed <- c("Uncond", "KD-IC-TRC", "KD-IC-NML", "TBATS", "BATS", "FOURIER", "DYNREG")
 stopifnot(algo %in% algos_allowed)
 
 #res <- mclapply(alliseries, function(iseries){
@@ -88,8 +90,176 @@ for(iseries in alliseries){
   res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
   dir.create(file.path(basef.folder, algo), showWarnings = FALSE)
  
+  if(algo == "DYNREG"){
+    only.resid <- FALSE
+    fourier.series = function(t,terms,period)
+    {
+      n = length(t)
+      X = matrix(,nrow=n,ncol=2*terms)
+      for(i in 1:terms)
+      {
+        X[,2*i-1] = sin(2*pi*i*t/period)
+        X[,2*i]   = cos(2*pi*i*t/period)
+      }
+      colnames(X) = paste(c("S","C"),rep(1:terms,rep(2,terms)),sep="")
+      return(X)
+    }
+    
+    p1 <- 48
+    p2 <- 336
+    max_k1 <- p1/2
+    max_k2 <- p2/2
+    
+    #X1 <- fourier(y, K = c(max_k1, max_k2))	
+    #X2 <- fourier.series(tyear, 4, 365.25)
+    #X <- cbind(X1, X2)
+    
+    tyear <- calendar$tyear
+    y <- msts(demand, seasonal.periods = c(p1, p2))  
+    X1 <- fourier(y, K = c(max_k1, max_k2))	
+    X2 <- fourier.series(tyear, 4, 365.25)
+    X <- cbind(X1, X2)
+    
+    
+    ids_future <- test$id
+    nb_futuredays <- length(seq_testing_interval)/48
+    
+    model_arima <- model_fourier <- model_var <- NULL
+    all_qf <- all_mf <- all_sd <- vector("list", nb_futuredays)
+    mydays <- seq(1, nb_futuredays)
+    
+    for(id_future_day in mydays){
+      print(id_future_day)
+      #print(base::date())
+      
+      if(id_future_day == 1){
+        ids_past   <-  learn$id
+        n_past_obs <- length(ids_past)
+      }else{
+        n_past_obs <- n_past_obs_tbats
+        ids_past   <- tail(learn$id, n_past_obs)
+      }
+      
+      offset_nhours <- (id_future_day - 1) * 48
+      ids_future_hours <- ids_future[offset_nhours + seq(1, 48)] 
+      
+      if(offset_nhours > 0){
+        ids_past_actual <- c(ids_past, ids_future)[offset_nhours + seq(n_past_obs)]
+      }else{
+        ids_past_actual <- ids_past
+      }
+      
+      ypast <- as.numeric(demand[ids_past_actual])
+      
+      #y <- msts(y, seasonal.periods = c(48, 336))     
+      #tyear <- calendar$tyear[ids_past_actual]
+      
+      Xpast   <- X[ids_past_actual, ]
+      Xfuture <- X[ids_future_hours, ]
+      X2past   <- X2[ids_past_actual, ]
+      X2future <- X2[ids_future_hours, ]
+      
+      do.fitting <- (id_future_day - 1) %% 7 == 0
+      if(do.fitting){
+        print("fitting")
+        res_cv_mu <- cv.glmnet(x = Xpast, y = ypast, nfolds = 3, alpha = 1)
+        best_lamnda <- res_cv_mu$lambda[which.min(res_cv_mu$cvm)]
+        model_fourier <- glmnet(y = ypast, x = Xpast, alpha = 1, lambda = best_lamnda)
+       
+        res_cv_var <- cv.glmnet(X2past, log_efourier_squared, nfolds = 3, alpha = 0)
+        best_lamnda <- res_cv_var$lambda[which.min(res_cv_var$cvm)]
+        model_var <- glmnet(y = log_efourier_squared, x = X2past, alpha = 0, lambda = best_lamnda)
+      }
+      
+      mu_fourier <- as.numeric(predict(model_fourier, Xpast))
+      efourier <- ypast - mu_fourier
+      log_efourier_squared <- as.numeric(log(efourier^2))
+      var_hat <- as.numeric(predict(model_var, X2past))
+      var_hat <- exp(var_hat)
+      efourier_scaled <- (ypast - mu_fourier)/sqrt(var_hat)
+      
+      if(do.fitting){
+        model_arima <- auto.arima(efourier_scaled, seasonal=FALSE)
+        
+        if(id_future_day == 1)
+        {
+          mu_arima <- fitted(model_arima)
+          mu_hat <- as.numeric(mu_fourier + mu_arima * sqrt(var_hat)) 
+          e_residuals <- ypast - mu_hat
+          
+          dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
+          resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+          save(file = resid_file, list = c("e_residuals"))
+        } 
+      }else{
+        
+       model_arima <- Arima(efourier_scaled, model = model_arima)
+        #mu_hat <- as.numeric(mu_fourier + mu_arima * sqrt(var_hat)) 
+      }
+      
+      if(!only.resid){
+        res <- forecast(model_arima, h = 48, level = 95)
+        mu_hat_escaled <- res$mean
+        sd_hat_escaled <- (res$upper-res$lower)/1.96/2
+        qf_escaled <- matrix(NA, nrow = length(alphas), ncol = 48)
+        for(h in seq(48))
+          qf_escaled[,h] <- qnorm(alphas, mu_hat_escaled[h], sd_hat_escaled[h])
+        
+        mu_fourier_pred <- predict(model_fourier, Xfuture)
+        var_pred <- exp(predict(model_var, X2future))
+        sd_pred <- sqrt(as.numeric(var_pred))
+        
+        qf     <- t(t(qf_escaled) * sd_pred + as.numeric(mu_fourier_pred))
+        mu_hat <- as.numeric(mu_hat_escaled * sd_pred + as.numeric(mu_fourier_pred))
+        #matplot(, type = 'l')
+        
+        all_qf[[id_future_day]] <- qf
+        all_mf[[id_future_day]] <- mu_hat
+      }
+
+
+
+    } # test days	
+    
+    if(!only.resid)
+      save(file = res_file, list = c("all_qf", "all_mf"))
+    
+    
+  }else if(algo == "FOURIER"){
+    
   
-  if(algo == "Uncond"){
+    
+    
+    y <- demand[learn$id]
+    
+    tyear <- calendar$tyear[learn$id]
+    h <- calendar$periodOfDay[learn$id]
+    
+    ltsc = lm(y ~ tyear + fourier.series(tyear , 4, 365.25))
+    ltsc_bis = lm(y ~ fourier.series(tyear , 4, 365.25))
+    
+    plot.ts(y)
+    lines(fitted(ltsc), col = "red")
+    lines(fitted(ltsc_bis), col = "blue")
+    
+    stop("done")
+    y <- demand[tail(learn$id, 48 * 7 * 4 * 3)]
+    
+    s1 <- 48
+    s2 <- 336
+    y <- msts(y, seasonal.periods = c(s1, s2))
+    
+    max_k1 <- s1/8
+    max_k2 <- s2/8
+    X <- fourier(y, K = c(max_k1, max_k2))
+    
+    model <- auto.arima(y, xreg = X, seasonal=FALSE,
+                        parallel = TRUE, num.cores = 2, stepwise = F,
+                        approximation = TRUE)
+    
+    stop("done")
+    
+  }else if(algo == "Uncond"){
     qFlearn <- quantile(demand[learn$id], alphas)
     qFtest <- matrix(rep(qFlearn, length(test$id)), ncol = length(test$id))
     

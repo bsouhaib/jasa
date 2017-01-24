@@ -7,14 +7,15 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-do.agg <- FALSE
-alliseries <- c(130)
+do.agg <- T
+alliseries <- c(1)
 
 #mymfrow <- c(3, 2); 
 idays <- seq(1, 92, by = 1)
 tag <- "TAG"; 
 #algorithms <- c("KD-IC-NML", "TBATS")
 algorithms <- c("KD-IC-NML")
+algorithms <- c("DYNREG")
 only.future <- FALSE
 
 savepdf(file.path(results.folder, paste("PLOT_forecasts_ALL", tag, sep = "") ))
@@ -69,7 +70,7 @@ for(iseries in alliseries){
 
     if(algo_load == "KD-IC-NML"){
       list_load[[ialgo]] <- list(all_qf = all_qf, all_tau = all_tau, all_mf = all_mf) #res_testing
-    }else if(algo_load == "TBATS"){
+    }else if(algo_load == "TBATS" || algo_load == "DYNREG"){
       list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf)
     }else if(algo_load == "Uncond"){
       list_load[[ialgo]] <- list(qFtest = qFtest, mFtest = mFtest)
@@ -84,7 +85,7 @@ for(iseries in alliseries){
       algo <- algorithms[ialgo]
       algo_load <- algo
       
-      if(algo_load == "KD-IC-NML" || algo_load == "TBATS"){
+      if(algo_load == "KD-IC-NML" || algo_load == "TBATS" || algo_load == "DYNREG"){
         
         all_qf <- list_load[[ialgo]]$all_qf
         all_mf <- list_load[[ialgo]]$all_mf
@@ -99,7 +100,7 @@ for(iseries in alliseries){
             qf
           })
         
-        }else if(algo_load == "TBATS"){
+        }else if(algo_load == "TBATS" || algo_load == "DYNREG"){
           qf_allhours <- sapply(seq(48), function(hour){
             qf <- all_qf[[iday]][, hour]
           })
