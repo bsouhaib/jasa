@@ -4,12 +4,12 @@ args = (commandArgs(TRUE))
 if(length(args) == 0){
   #hierarchy <- "geo"
   #ncores <- 2
-  #algo <- c("KD-IC-NML")
+  algo <- c("KD-IC-NML")
   #algo <- c("TBATS")
-  algo <- "DYNREG"
+  #algo <- "DYNREG"
     
   do.agg <- T
-  alliseries <- 1
+  alliseries <- 55
   #do.agg <- FALSE
   #alliseries <- 10
   
@@ -165,15 +165,16 @@ for(iseries in alliseries){
         res_cv_mu <- cv.glmnet(x = Xpast, y = ypast, nfolds = 3, alpha = 1)
         best_lamnda <- res_cv_mu$lambda[which.min(res_cv_mu$cvm)]
         model_fourier <- glmnet(y = ypast, x = Xpast, alpha = 1, lambda = best_lamnda)
-       
+      }
+      mu_fourier <- as.numeric(predict(model_fourier, Xpast))
+      efourier <- ypast - mu_fourier
+      log_efourier_squared <- as.numeric(log(efourier^2))
+      
+      if(do.fitting){
         res_cv_var <- cv.glmnet(X2past, log_efourier_squared, nfolds = 3, alpha = 0)
         best_lamnda <- res_cv_var$lambda[which.min(res_cv_var$cvm)]
         model_var <- glmnet(y = log_efourier_squared, x = X2past, alpha = 0, lambda = best_lamnda)
       }
-      
-      mu_fourier <- as.numeric(predict(model_fourier, Xpast))
-      efourier <- ypast - mu_fourier
-      log_efourier_squared <- as.numeric(log(efourier^2))
       var_hat <- as.numeric(predict(model_var, X2past))
       var_hat <- exp(var_hat)
       efourier_scaled <- (ypast - mu_fourier)/sqrt(var_hat)
@@ -284,44 +285,50 @@ for(iseries in alliseries){
     
     ### LEARNING
     res_learning <- predictkde("learning")
+    stop("done")
+    results_crps <- sapply(res_learning$results, function(list_vectors){
+      sapply(list_vectors, function(vector){identity(vector)
+        })
+      }, simplify = "array") 
+    ic_days <- res_learning$ic_days
     
-    # Best bandwith for dayhours
-    crps_dayhours <- getfromlist(res_learning$res_dayhours, "crps")
-    avg_crps_dayhours <- apply(crps_dayhours, 1, mean)
-    id_best_dayhours <- which.min(avg_crps_dayhours)
-    bandwiths_dayhours_best <- res_learning$bandwiths_dayhours[id_best_dayhours]
-    
-    # Best bandwith for nighthours
-    crps_nighthours <- getfromlist(res_learning$res_nighthours, "crps")
-    avg_crps_nighthours <- apply(crps_nighthours, 1, mean)
-    id_best_nighthours <- which.min(avg_crps_nighthours)
-    bandwiths_nighthours_best <- res_learning$bandwiths_nighthours[id_best_nighthours]
+    idbest_bandwiths <- NULL
+    for(ic in seq(3)){
+      err <- apply(results_crps[, , which(ic_days == ic)], 1, median)
+      plot.ts(err)
+      idbest_bandwiths <- c(idbest_bandwiths, which.min(err))
+    }
+    selected_bandwiths_ic <- res_learning$bandwiths[idbest_bandwiths]
     
     # I DO NOT SAVE LEARNING INFORMATION
     
     ### TESTING
-    res_testing <- predictkde("testing", 
-                              bandwiths_nighthours = bandwiths_nighthours_best, 
-                              bandwiths_dayhours = bandwiths_dayhours_best)
+    res_testing <- predictkde("testing", selected_bandwiths = selected_bandwiths_ic)
     
-    order_hours <- match(seq(48), c(hours_night, hours_day))
+    #order_hours <- match(seq(48), c(hours_night, hours_day))
     
     # CRPS
     # all_crps <- getItem(res_testing, "crps", order_hours)
-    all_qf  <- getItem(res_testing, "qtauhat", order_hours)
-    all_tau <- getItem(res_testing, "tauhat", order_hours)
-    all_mf  <- getItem(res_testing, "mu_hat", order_hours)
+    
+    all_qf  <- getfromlist(res_testing$results, "qtauhat")
+    all_tau <- getfromlist(res_testing$results, "tauhat")
+    all_mf  <- getfromlist(res_testing$results, "mu_hat")
+    
+    #all_qf  <- getItem(res_testing, "qtauhat", order_hours)
+    #all_tau <- getItem(res_testing, "tauhat", order_hours)
+    #all_mf  <- getItem(res_testing, "mu_hat", order_hours)
     
     save(file = res_file, list = c("all_qf", "all_tau", "all_mf"))
     
     ### IN SAMPLE
-    res_insample_info <- predictkde("insample_info", 
-                                bandwiths_nighthours = bandwiths_nighthours_best, 
-                                bandwiths_dayhours = bandwiths_dayhours_best)
+    res_insample_info <- predictkde("insample_info", selected_bandwiths = selected_bandwiths_ic)
 
     # residuals
-    all_residuals <- getItem(res_insample_info, "residuals", order_hours)
-    e_residuals <- unlist(all_residuals)
+    all_residuals <- getfromlist(res_insample_info$results, "residuals")
+    stop("CHECK RESIDUALS !!!")
+    #all_residuals <- getItem(res_insample_info, "residuals", order_hours)
+    #e_residuals <- unlist(all_residuals)
+    
     dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
     resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, ".Rdata", sep = "")) 
     save(file = resid_file, list = c("e_residuals"))
