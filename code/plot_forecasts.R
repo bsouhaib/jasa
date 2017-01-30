@@ -12,9 +12,10 @@ alliseries <- c(55)
 
 #mymfrow <- c(3, 2); 
 idays <- seq(1, 92, by = 1)
-tag <- "TAG"; 
+tag <- "WITHLOG"; 
 #algorithms <- c("KD-IC-NML", "TBATS")
 algorithms <- c("KD-IC-NML")
+#algorithms <- c("DYNREG", "KD-IC-NML")
 algorithms <- c("DYNREG")
 only.future <- FALSE
 
@@ -79,6 +80,14 @@ for(iseries in alliseries){
   
   
   for(iday in idays){
+    
+    day_min <- Inf
+    day_max <- -Inf
+    for(ialgo in seq_along(algorithms)){
+      day_min <- pmin(day_min, min(list_load[[ialgo]]$all_qf[[iday]]))
+      day_max <- pmax(day_max, max(list_load[[ialgo]]$all_qf[[iday]]))
+    }
+
     print(iday)
     for(ialgo in seq_along(algorithms)){
       
@@ -124,7 +133,8 @@ for(iseries in alliseries){
                         abbr.dweek[calendar$dweek[test$id[1] + (iday - 1) * 48]],
                         sep = "")
         
-        myYLIM <- c(0, max(c(future, qf_allhours[subalphas, ]), na.rm = T))	
+      #myYLIM <- c(0, max(c(future, qf_allhours[subalphas, ]), na.rm = T))	
+        myYLIM <- c(day_min, day_max)
         
         plotQF(qf_allhours, future, subalphas, id = seq(48), only.future = only.future,
                main = mymain, xlab = "Time", ylab = "Electricity demand", xaxt='n', cex.lab = 1.2, ylim = myYLIM)

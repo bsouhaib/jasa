@@ -8,32 +8,20 @@ if(length(args) == 0){
   #algo <- c("TBATS")
   #algo <- "DYNREG"
     
-  do.agg <- T
-  alliseries <- 55
-  #do.agg <- FALSE
-  #alliseries <- 10
-  
+  do.agg <- F
+  alliseries <- 486
 }else{
   
   for(i in 1:length(args)){
     print(args[[i]])
   }
   
-  #hierarchy <- args[[1]]
-  #ncores <- as.numeric(args[[1]])
   algo <- args[[1]]
   do.agg <- as.logical(args[[2]])
   alliseries <- NULL
   for(i in seq(3, length(args))){
     alliseries <- c(alliseries, as.numeric(args[[i]]))
   }
-
-  #algorithms <- NULL
-  #for(i in seq(4, length(args))){
-  #	algorithms <- c(algorithms, args[[i]])
-  #}
-  
-  
 }
 
 print(algo)
@@ -53,11 +41,9 @@ library(glmnet)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-algos_allowed <- c("Uncond", "KD-IC-TRC", "KD-IC-NML", "TBATS", "BATS", "FOURIER", "DYNREG")
+algos_allowed <- c("Uncond", "KD-IC-NML", "DYNREG")
 stopifnot(algo %in% algos_allowed)
 
-#res <- mclapply(alliseries, function(iseries){
-#res <- mclapply(seq(2), function(iseries){
 for(iseries in alliseries){
 
   print(iseries)
@@ -73,16 +59,7 @@ for(iseries in alliseries){
   #{
   #  demand <- demand + jitter(demand, amount = 0)
   #}
-  
-  do.scaling <- FALSE
-  if(do.scaling){
-    demand <- demand / max(demand)
-  }
-  
-  
-  #set.seed(1986)
-  #u1 <- runif(10000)
-  #u2 <- runif(10000)
+
   
   #for(algo in algorithms){
   
@@ -91,11 +68,14 @@ for(iseries in alliseries){
   dir.create(file.path(basef.folder, algo), showWarnings = FALSE)
  
   if(algo == "DYNREG"){
+    
+    do.logtrans <- T
     only.resid <- FALSE
+
     fourier.series = function(t,terms,period)
     {
       n = length(t)
-      X = matrix(,nrow=n,ncol=2*terms)
+      X = matrix(NA, nrow=n, ncol=2*terms)
       for(i in 1:terms)
       {
         X[,2*i-1] = sin(2*pi*i*t/period)
@@ -103,6 +83,10 @@ for(iseries in alliseries){
       }
       colnames(X) = paste(c("S","C"),rep(1:terms,rep(2,terms)),sep="")
       return(X)
+    }
+    
+    backtransform_log <- function(x, fvar){
+      exp(x) * (1 + 0.5 * fvar)
     }
     
     p1 <- 48
@@ -115,12 +99,18 @@ for(iseries in alliseries){
     #X <- cbind(X1, X2)
     
     tyear <- calendar$tyear
-    y <- msts(demand, seasonal.periods = c(p1, p2))  
+
+    if(do.logtrans){
+      my_ts <- log(demand)	     
+    }else{
+      my_ts <- demand
+    }
+    
+    y <- msts(my_ts, seasonal.periods = c(p1, p2))  
     X1 <- fourier(y, K = c(max_k1, max_k2))	
     X2 <- fourier.series(tyear, 4, 365.25)
     X <- cbind(X1, X2)
-    
-    
+
     ids_future <- test$id
     nb_futuredays <- length(seq_testing_interval)/48
     
@@ -149,7 +139,7 @@ for(iseries in alliseries){
         ids_past_actual <- ids_past
       }
       
-      ypast <- as.numeric(demand[ids_past_actual])
+      ypast <- as.numeric(my_ts[ids_past_actual])
       
       #y <- msts(y, seasonal.periods = c(48, 336))     
       #tyear <- calendar$tyear[ids_past_actual]
@@ -162,9 +152,9 @@ for(iseries in alliseries){
       do.fitting <- (id_future_day - 1) %% 7 == 0
       if(do.fitting){
         print("fitting")
-        res_cv_mu <- cv.glmnet(x = Xpast, y = ypast, nfolds = 3, alpha = 1)
-        best_lamnda <- res_cv_mu$lambda[which.min(res_cv_mu$cvm)]
-        model_fourier <- glmnet(y = ypast, x = Xpast, alpha = 1, lambda = best_lamnda)
+        res_cv_mufourier <- cv.glmnet(x = Xpast, y = ypast, nfolds = 3, alpha = 1)
+        best_lambda_mufourier <- res_cv_mufourier$lambda[which.min(res_cv_mufourier$cvm)]
+        model_fourier <- glmnet(y = ypast, x = Xpast, alpha = 1, lambda = best_lambda_mufourier)
       }
       mu_fourier <- as.numeric(predict(model_fourier, Xpast))
       efourier <- ypast - mu_fourier
@@ -179,14 +169,23 @@ for(iseries in alliseries){
       var_hat <- exp(var_hat)
       efourier_scaled <- (ypast - mu_fourier)/sqrt(var_hat)
       
+      #stop("done")
+      
       if(do.fitting){
         model_arima <- auto.arima(efourier_scaled, seasonal=FALSE)
         
         if(id_future_day == 1)
         {
-          mu_arima <- fitted(model_arima)
-          mu_hat <- as.numeric(mu_fourier + mu_arima * sqrt(var_hat)) 
-          e_residuals <- ypast - mu_hat
+          #mu_arima <- fitted(model_arima)
+          #mu_hat <- as.numeric(mu_fourier + mu_arima * sqrt(var_hat))
+          #if(do.logtrans){
+          #  mu_hat <- backtransform_log(mu_hat, var_hat) 
+          # is it the right variance ???? !!
+          #} 
+          #e_residuals <- ypast - mu_hat
+          
+          e_residuals <- resid(model_arima)
+          #stop("done")
           
           dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
           resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
@@ -197,7 +196,7 @@ for(iseries in alliseries){
        model_arima <- Arima(efourier_scaled, model = model_arima)
         #mu_hat <- as.numeric(mu_fourier + mu_arima * sqrt(var_hat)) 
       }
-      
+
       if(!only.resid){
         res <- forecast(model_arima, h = 48, level = 95)
         mu_hat_escaled <- res$mean
@@ -214,51 +213,19 @@ for(iseries in alliseries){
         mu_hat <- as.numeric(mu_hat_escaled * sd_pred + as.numeric(mu_fourier_pred))
         #matplot(, type = 'l')
         
+        if(do.logtrans){
+          qf <- exp(qf)
+          mu_hat <- backtransform_log(mu_hat, var_pred)
+        }
+        
         all_qf[[id_future_day]] <- qf
         all_mf[[id_future_day]] <- mu_hat
       }
-
-
 
     } # test days	
     
     if(!only.resid)
       save(file = res_file, list = c("all_qf", "all_mf"))
-    
-    
-  }else if(algo == "FOURIER"){
-    
-  
-    
-    
-    y <- demand[learn$id]
-    
-    tyear <- calendar$tyear[learn$id]
-    h <- calendar$periodOfDay[learn$id]
-    
-    ltsc = lm(y ~ tyear + fourier.series(tyear , 4, 365.25))
-    ltsc_bis = lm(y ~ fourier.series(tyear , 4, 365.25))
-    
-    plot.ts(y)
-    lines(fitted(ltsc), col = "red")
-    lines(fitted(ltsc_bis), col = "blue")
-    
-    stop("done")
-    y <- demand[tail(learn$id, 48 * 7 * 4 * 3)]
-    
-    s1 <- 48
-    s2 <- 336
-    y <- msts(y, seasonal.periods = c(s1, s2))
-    
-    max_k1 <- s1/8
-    max_k2 <- s2/8
-    X <- fourier(y, K = c(max_k1, max_k2))
-    
-    model <- auto.arima(y, xreg = X, seasonal=FALSE,
-                        parallel = TRUE, num.cores = 2, stepwise = F,
-                        approximation = TRUE)
-    
-    stop("done")
     
   }else if(algo == "Uncond"){
     qFlearn <- quantile(demand[learn$id], alphas)
@@ -281,11 +248,9 @@ for(iseries in alliseries){
       mykernel <- "normal"
     }
     
-    #print(mykernel)
-    
     ### LEARNING
     res_learning <- predictkde("learning")
-    stop("done")
+    
     results_crps <- sapply(res_learning$results, function(list_vectors){
       sapply(list_vectors, function(vector){identity(vector)
         })
@@ -295,49 +260,40 @@ for(iseries in alliseries){
     idbest_bandwiths <- NULL
     for(ic in seq(3)){
       err <- apply(results_crps[, , which(ic_days == ic)], 1, median)
-      plot.ts(err)
       idbest_bandwiths <- c(idbest_bandwiths, which.min(err))
     }
     selected_bandwiths_ic <- res_learning$bandwiths[idbest_bandwiths]
     
-    # I DO NOT SAVE LEARNING INFORMATION
-    
     ### TESTING
     res_testing <- predictkde("testing", selected_bandwiths = selected_bandwiths_ic)
     
-    #order_hours <- match(seq(48), c(hours_night, hours_day))
-    
-    # CRPS
-    # all_crps <- getItem(res_testing, "crps", order_hours)
-    
+    # all_crps <- getItem(res_testing$results, "crps")
     all_qf  <- getfromlist(res_testing$results, "qtauhat")
     all_tau <- getfromlist(res_testing$results, "tauhat")
     all_mf  <- getfromlist(res_testing$results, "mu_hat")
     
-    #all_qf  <- getItem(res_testing, "qtauhat", order_hours)
-    #all_tau <- getItem(res_testing, "tauhat", order_hours)
-    #all_mf  <- getItem(res_testing, "mu_hat", order_hours)
-    
     save(file = res_file, list = c("all_qf", "all_tau", "all_mf"))
     
-    ### IN SAMPLE
+    ### IN SAMPLE INFO
     res_insample_info <- predictkde("insample_info", selected_bandwiths = selected_bandwiths_ic)
 
     # residuals
     all_residuals <- getfromlist(res_insample_info$results, "residuals")
-    stop("CHECK RESIDUALS !!!")
-    #all_residuals <- getItem(res_insample_info, "residuals", order_hours)
-    #e_residuals <- unlist(all_residuals)
+    e_residuals_unscaled <- unlist(all_residuals)
+    all_var <- getfromlist(res_insample_info$results, "var_hat")
+    all_varhat <- unlist(all_var)
+    e_residuals <- e_residuals_unscaled/sqrt(all_varhat)
     
     dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
     resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, ".Rdata", sep = "")) 
     save(file = resid_file, list = c("e_residuals"))
     
     # extract cdfs
-    all_qf  <- getItem(res_insample_info, "qtauhat", order_hours)
-    all_tau <- getItem(res_insample_info, "tauhat", order_hours)
+    all_qf_insample  <- getfromlist(res_insample_info$results, "qtauhat")
+    all_tau_insample <- getfromlist(res_insample_info$results, "tauhat")
+    
     insamplecdf_file <- file.path(insample.folder, algo, paste("insamplecdf_", idseries, "_", algo, ".Rdata", sep = "")) 
-    save(file = insamplecdf_file, list = c("all_qf", "all_tau"))
+    save(file = insamplecdf_file, list = c("all_qf_insample", "all_tau_insample"))
     
   }else if(algo %in% c("TBATS", "BATS")){
     

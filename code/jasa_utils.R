@@ -226,14 +226,17 @@ kde <- function(id_query, ids_data, bandwiths, task){
       }
     }
 
-  }
+    
+    
+  }# bandwiths
+ # browser()
   
   if(task == "learning"){
     ret <- crps #list(crps = crps)
   }else if(task == "testing"){
     ret <- list(crps = crps, squared_error = squared_error, qtauhat = xgrid, tauhat = cdf, mu_hat = mu_hat, var_hat = var_hat)
   }else if(task == "insample_info"){
-    ret <- list(residuals = residuals, qtauhat = xgrid, tauhat = cdf)
+    ret <- list(residuals = residuals, qtauhat = xgrid, tauhat = cdf, mu_hat = mu_hat, var_hat = var_hat, mu_hat = mu_hat)
   }else{
     stop("ERROR ...")
   }
@@ -568,11 +571,11 @@ predictkdeOLD <- function(task = c("learning", "testing", "insample_info"), band
 }
 
 getfromlist <- function(mylist, item = c("crps", "residuals", "squared_error", "qtauhat", "tauhat", "mu_hat", "var_hat")){
-  sapply(mylist, function(daylist){
+  lapply(mylist, function(daylist){
     sapply(daylist, function(hourlist){
       hourlist[[item]]
     }, simplify = "array")
-  }, simplify = "array")
+  })
 }
 
 
