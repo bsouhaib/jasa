@@ -2,46 +2,36 @@
 
 rscript="basef.R"
 
-doagg=TRUE
-#doagg=FALSE
+doagg="TRUE"
 
-algo="KD-IC-NML"
-#algo="TBATS"
+#if [[ "$doagg" -eq "TRUE" ]]; then
 
+#tag="agg"
+#algo="DYNREG"
+#njobs=5
+#nperjobs=11
 
-if [[ "$doagg" -eq "TRUE" ]]; then
-tag="agg"
-  if [[ "$1" -eq 1 ]]; then
-  	alliseries=$(seq 1 14 )
-  elif [[ "$1" -eq 2 ]]; then
-  	alliseries=$(seq 15 28 )
-  elif [[ "$1" -eq 3 ]]; then
-  	alliseries=$(seq 29 40 )
-  elif [[ "$1" -eq 4 ]]; then
-  	alliseries=$(seq 41 55 )
-  fi
-elif [[ "$doagg" -eq "FALSE" ]]; then
+#elif [[ "$doagg" -eq "FALSE" ]]; then
+
 tag="bottom"
-  if [[ "$1" -eq 1 ]]; then
-  	alliseries=$(seq 1 4 1584 )
-  elif [[ "$1" -eq 2 ]]; then
-  	alliseries=$(seq 2 4 1584 )
-  elif [[ "$1" -eq 3 ]]; then
-  	alliseries=$(seq 3 4 1584 )
-  elif [[ "$1" -eq 4 ]]; then
-  	alliseries=$(seq 4 4 1584 )
-  fi
-fi
+algo="KD-IC-NML"
+njobs=16
+nperjobs=99
 
-echo "${alliseries[@]}"
-echo "$tag"
+#fi
 
-Rscript --vanilla $rscript $algo $doagg ${alliseries[@]} > "/home/rstudio/PROJ/rout/outputFile-$tag-$algo-$1.Rout" 2> "/home/rstudio/PROJ/rout/errorFile-$tag-$algo-$1.Rout"
 
-#for(iseries in seq_along(bottomSeries)){
-#	idseries <- bottomSeries[iseries]
-#	res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
-#	if(!file.exists(res_file)){
-#		print(res_file)
-#	}
-#}
+allijobs=$(seq 1 $njobs )
+
+for ijob in ${allijobs[@]}
+do
+  start=$(( 0 + ($ijob - 1)* ($nperjobs) + 1 ))
+  end=$(( 0 + ($ijob - 1)* ($nperjobs) + ($nperjobs) ))
+  alliseries=( $(seq $start $end ) )
+  
+  echo "${alliseries[@]}"
+  
+  #Rscript --vanilla $rscript $algo $doagg ${alliseries[@]} > "/home/rstudio/PROJ/rout/outputFile-$tag-$algo-$ijob.Rout" 2> "/home/rstudio/PROJ/rout/errorFile-$tag-$algo-$ijob.Rout"
+
+done
+

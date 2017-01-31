@@ -8,8 +8,8 @@ if(length(args) == 0){
   #algo <- c("TBATS")
   #algo <- "DYNREG"
     
-  do.agg <- F
-  alliseries <- 486
+  do.agg <- T
+  alliseries <- 1
 }else{
   
   for(i in 1:length(args)){
@@ -59,7 +59,8 @@ for(iseries in alliseries){
   #{
   #  demand <- demand + jitter(demand, amount = 0)
   #}
-
+  
+  
   
   #for(algo in algorithms){
   
@@ -69,8 +70,8 @@ for(iseries in alliseries){
  
   if(algo == "DYNREG"){
     
-    do.logtrans <- T
-    only.resid <- FALSE
+    do.logtrans <- TRUE
+    only.insample <- FALSE
 
     fourier.series = function(t,terms,period)
     {
@@ -119,7 +120,7 @@ for(iseries in alliseries){
     mydays <- seq(1, nb_futuredays)
     
     for(id_future_day in mydays){
-      print(id_future_day)
+      #print(id_future_day)
       #print(base::date())
       
       if(id_future_day == 1){
@@ -149,83 +150,100 @@ for(iseries in alliseries){
       X2past   <- X2[ids_past_actual, ]
       X2future <- X2[ids_future_hours, ]
       
-      do.fitting <- (id_future_day - 1) %% 7 == 0
+      #do.fitting <- (id_future_day - 1) %% 7 == 0
+      do.fitting <- TRUE
+      
       if(do.fitting){
-        print("fitting")
-        res_cv_mufourier <- cv.glmnet(x = Xpast, y = ypast, nfolds = 3, alpha = 1)
-        best_lambda_mufourier <- res_cv_mufourier$lambda[which.min(res_cv_mufourier$cvm)]
-        model_fourier <- glmnet(y = ypast, x = Xpast, alpha = 1, lambda = best_lambda_mufourier)
+        #print("fitting")
+        cv_mu_z_fourier <- cv.glmnet(y = ypast, x = Xpast, nfolds = 3, alpha = 1)
+        best_lambda_mu_z_fourier <- cv_mu_z_fourier$lambda[which.min(cv_mu_z_fourier$cvm)]
+        model_mu_z_fourier <- glmnet(y = ypast, x = Xpast, alpha = 1, lambda = best_lambda_mu_z_fourier)
       }
-      mu_fourier <- as.numeric(predict(model_fourier, Xpast))
-      efourier <- ypast - mu_fourier
+      mu_z_fourier <- as.numeric(predict(model_mu_z_fourier, Xpast))
+      efourier <- ypast - mu_z_fourier
       log_efourier_squared <- as.numeric(log(efourier^2))
       
       if(do.fitting){
-        res_cv_var <- cv.glmnet(X2past, log_efourier_squared, nfolds = 3, alpha = 0)
-        best_lamnda <- res_cv_var$lambda[which.min(res_cv_var$cvm)]
-        model_var <- glmnet(y = log_efourier_squared, x = X2past, alpha = 0, lambda = best_lamnda)
+        cv_var_z_fourier <- cv.glmnet(X2past, log_efourier_squared, nfolds = 3, alpha = 0)
+        best_lamnda_var_z_fourier <- cv_var_z_fourier$lambda[which.min(cv_var_z_fourier$cvm)]
+        model_var_z_fourier <- glmnet(y = log_efourier_squared, x = X2past, alpha = 0, lambda = best_lamnda_var_z_fourier)
       }
-      var_hat <- as.numeric(predict(model_var, X2past))
-      var_hat <- exp(var_hat)
-      efourier_scaled <- (ypast - mu_fourier)/sqrt(var_hat)
-      
-      #stop("done")
+      var_z_fourier <- exp(as.numeric(predict(model_var_z_fourier, X2past)))
+      efourier_scaled <- (ypast - mu_z_fourier)/sqrt(var_z_fourier)
       
       if(do.fitting){
         model_arima <- auto.arima(efourier_scaled, seasonal=FALSE)
-        
         if(id_future_day == 1)
         {
-          #mu_arima <- fitted(model_arima)
-          #mu_hat <- as.numeric(mu_fourier + mu_arima * sqrt(var_hat))
-          #if(do.logtrans){
-          #  mu_hat <- backtransform_log(mu_hat, var_hat) 
-          # is it the right variance ???? !!
-          #} 
-          #e_residuals <- ypast - mu_hat
-          
           e_residuals <- resid(model_arima)
-          #stop("done")
-          
+
           dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
           resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
           save(file = resid_file, list = c("e_residuals"))
+          
+          # insample quantiles
+          mu_e <- fitted(model_arima)
+          var_e <- model_arima$sigma2
+          
+          qf_e <- sapply(seq_along(mu_e), function(i){
+            qnorm(alphas, mean = mu_e[i], sd = sqrt(var_e))
+          })
+          
+          mu_z <- as.numeric(mu_z_fourier + mu_e * sqrt(var_z_fourier))
+          qf_z <- t(as.numeric(mu_z_fourier) + t(qf_e) * sqrt(var_z_fourier))
+          var_z <- var_e * var_z_fourier
+          
+          if(do.logtrans){
+            mu_y <- backtransform_log(mu_z, var_z)
+            qf_y <- exp(qf_z)
+          }else{
+            mu_y <- mu_z
+            qf_y <- qf_z 
+          }
+          all_qf_insample <- qf_y
+            
+          #insample_quantile_file <- file.path(insample.folder, algo, paste("quantiles_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+          #save(file = insample_quantile_file, list = c("all_qf_insample"))
+          
+          #if(only.insample){
+          #  stop("INSAMPLE DONE.")
+          #}
+          
         } 
       }else{
-        
-       model_arima <- Arima(efourier_scaled, model = model_arima)
-        #mu_hat <- as.numeric(mu_fourier + mu_arima * sqrt(var_hat)) 
+        model_arima <- Arima(efourier_scaled, model = model_arima)
       }
 
-      if(!only.resid){
-        res <- forecast(model_arima, h = 48, level = 95)
-        mu_hat_escaled <- res$mean
-        sd_hat_escaled <- (res$upper-res$lower)/1.96/2
-        qf_escaled <- matrix(NA, nrow = length(alphas), ncol = 48)
+      
+        f_arima <- forecast(model_arima, h = 48, level = 95)
+        mu_e <- f_arima$mean
+        sd_e <- (f_arima$upper-f_arima$lower)/1.96/2
+        qf_e <- matrix(NA, nrow = length(alphas), ncol = 48)
         for(h in seq(48))
-          qf_escaled[,h] <- qnorm(alphas, mu_hat_escaled[h], sd_hat_escaled[h])
+          qf_e[,h] <- qnorm(alphas, mu_e[h], sd_e[h])
         
-        mu_fourier_pred <- predict(model_fourier, Xfuture)
-        var_pred <- exp(predict(model_var, X2future))
-        sd_pred <- sqrt(as.numeric(var_pred))
+        mu_z_fourier  <-  predict(model_mu_z_fourier, Xfuture) 
+        var_z_fourier <- exp(predict(model_var_z_fourier, X2future))
+        sd_z_fourier  <- sqrt(as.numeric(var_z_fourier)) 
         
-        qf     <- t(t(qf_escaled) * sd_pred + as.numeric(mu_fourier_pred))
-        mu_hat <- as.numeric(mu_hat_escaled * sd_pred + as.numeric(mu_fourier_pred))
-        #matplot(, type = 'l')
+        qf_z     <- t(t(qf_e) * sd_z_fourier + as.numeric(mu_z_fourier))
+        mu_z <- as.numeric(mu_e * sd_z_fourier + as.numeric(mu_z_fourier))
+        var_z <-  sd_e^2 * sd_z_fourier^2
         
         if(do.logtrans){
-          qf <- exp(qf)
-          mu_hat <- backtransform_log(mu_hat, var_pred)
+          mu_y <- backtransform_log(mu_z, var_z)
+          qf_y <- exp(qf_z)
+        }else{
+          mu_y <- mu_z
+          qf_y <- qf_z
         }
-        
-        all_qf[[id_future_day]] <- qf
-        all_mf[[id_future_day]] <- mu_hat
-      }
+        all_mf[[id_future_day]] <- mu_y
+        all_qf[[id_future_day]] <- qf_y
+      
 
     } # test days	
     
-    if(!only.resid)
-      save(file = res_file, list = c("all_qf", "all_mf"))
+    save(file = res_file, list = c("all_qf", "all_mf"))
     
   }else if(algo == "Uncond"){
     qFlearn <- quantile(demand[learn$id], alphas)
@@ -264,6 +282,8 @@ for(iseries in alliseries){
     }
     selected_bandwiths_ic <- res_learning$bandwiths[idbest_bandwiths]
     
+    # boxplot(apply(results_crps[, , which(ic_days == ic)], 1, identity), outline = F)
+    
     ### TESTING
     res_testing <- predictkde("testing", selected_bandwiths = selected_bandwiths_ic)
     
@@ -288,12 +308,12 @@ for(iseries in alliseries){
     resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, ".Rdata", sep = "")) 
     save(file = resid_file, list = c("e_residuals"))
     
-    # extract cdfs
+    # extract insample quantiles
     all_qf_insample  <- getfromlist(res_insample_info$results, "qtauhat")
     all_tau_insample <- getfromlist(res_insample_info$results, "tauhat")
     
-    insamplecdf_file <- file.path(insample.folder, algo, paste("insamplecdf_", idseries, "_", algo, ".Rdata", sep = "")) 
-    save(file = insamplecdf_file, list = c("all_qf_insample", "all_tau_insample"))
+    #insample_quantile_file <- file.path(insample.folder, algo, paste("quantiles_", idseries, "_", algo, ".Rdata", sep = "")) 
+    #save(file = insample_quantile_file, list = c("all_qf_insample", "all_tau_insample"))
     
   }else if(algo %in% c("TBATS", "BATS")){
     

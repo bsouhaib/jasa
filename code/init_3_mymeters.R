@@ -84,7 +84,33 @@ for(idseries in bottomSeries){
   # Replacing special days
   obs <- obs[index_final]
   demand <- obs
-
+  
+  #if(idseries == bottomSeries[272]){
+  #  stop("done")  
+  #}
+  
+  #if(FALSE){
+  # reverting the discretaziation process
+  breaks  <- sort(unique(demand))
+  sds <- numeric(length(breaks)) 
+  for(i in seq_along(breaks)){
+    if(i == 1){ # some have a lot of repetitions of the min
+      sds[i] <- mean(c((breaks[i] - 0)/3, (breaks[i+1] - breaks[i])/3))
+      
+    }else if(i == length(breaks)){ # maximum 3 reptitions of the max (so, not important)
+      sds[i] <- (breaks[i] - breaks[i-1])/10
+    }else{ 
+      #(i != 1 && i != length(breaks)){
+      
+      sds[i] <- mean(c((breaks[i] - breaks[i -1])/3, (breaks[i+1] - breaks[i])/3))
+    }
+  }
+  demand_perturbed <- rnorm(length(demand), mean = demand, sd = sds[match(demand, breaks)])
+  demand_perturbed[which(demand_perturbed < 0)] <- 0 # very few will be negative
+  
+  demand <- demand_perturbed
+  #}
+  
   save(file = file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")) , list = c("demand"))
 }
 

@@ -3,9 +3,7 @@
 #}
 
 predictkde <- function(task = c("learning", "testing", "insample_info"), selected_bandwiths = NULL){
-  
-  
-  
+
   n_past_obs <- n_past_obs_kd
   
   if(task == "learning"){
@@ -40,14 +38,27 @@ predictkde <- function(task = c("learning", "testing", "insample_info"), selecte
     }
     
     #print("ok")
-    h_silver <- 0.9 * min(sd(x_samples), IQR(x_samples)/1.349) * n_approx ^(-.2)
+    #h_silver <- 0.9 * min(sd(x_samples), IQR(x_samples)/1.349) * n_approx ^(-.2)
+    #if(h_silver == 0){
+    #  h_silver <- 0.01
+    #}
+    #bandwiths <- c(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 3, 4, 5) * h_silver	
     
-    if(h_silver == 0){
-      h_silver <- 0.01
-    }
-    bandwiths <- c(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 3, 4, 5) * h_silver	
+    #bw_normal <- bw.nrd(sample(demand[ids_past], n_approx))
+    #bandwiths <-  seq(10^-6, bw_normal, length.out = 10)
     
     
+    res <- sapply(seq(10), function(l){
+      sapply(seq(48), function(h){bw.nrd(sample(demand[ids_past][seq(h, length(ids_past), by = 48)], n_approx))})
+    })
+    bw_normal <- max(apply(res, 1, mean))
+    
+    min_bandwith <- 10^-5
+    bandwiths_vec <- seq(min_bandwith, bw_normal, length.out = 5)
+    bandwiths_subvec1 <- seq(bandwiths_vec[1], bandwiths_vec[2], length.out = 5)
+    bandwiths_subvec2 <- seq(bandwiths_vec[2], bandwiths_vec[3], length.out = 5)
+    bandwiths <- c(bandwiths_subvec1, bandwiths_subvec2, bandwiths_vec[-seq(3)])
+    #bandwiths <-  seq(10^-4, bw_normal, length.out = 15)
     
     stopifnot(all(bandwiths>0))
     
@@ -229,7 +240,7 @@ kde <- function(id_query, ids_data, bandwiths, task){
     
     
   }# bandwiths
- # browser()
+  #browser()
   
   if(task == "learning"){
     ret <- crps #list(crps = crps)

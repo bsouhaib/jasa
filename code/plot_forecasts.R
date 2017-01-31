@@ -8,13 +8,13 @@ source("utils.R")
 load(file.path(work.folder, "myinfo.Rdata"))
 
 do.agg <- T
-alliseries <- c(55)
+alliseries <- c(1)
 
 #mymfrow <- c(3, 2); 
 idays <- seq(1, 92, by = 1)
-tag <- "WITHLOG"; 
+tag <- "TAG"; 
 #algorithms <- c("KD-IC-NML", "TBATS")
-algorithms <- c("KD-IC-NML")
+#algorithms <- c("KD-IC-NML")
 #algorithms <- c("DYNREG", "KD-IC-NML")
 algorithms <- c("DYNREG")
 only.future <- FALSE
