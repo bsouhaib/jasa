@@ -12,14 +12,15 @@ load(file.path(work.folder, "myinfo.Rdata"))
 
 algo.agg <- "DYNREG"
 algo.bottom <- "KD-IC-NML"
-print("KD uses 100 quantiles while DYNREG uses 21 quantiles")
 ntest <- length(test$id)
 
 QF_bottom <- vector("list", length(bottomSeries))
 QF_agg <- vector("list", length(aggSeries))
 
-obs_agg    <- matrix(NA, nrow =  length(aggSeries), ncol = ntest)
-obs_bottom <- matrix(NA, nrow =  length(bottomSeries), ncol = ntest)
+obs_agg    <- revisedmean_agg    <- matrix(NA, nrow =  length(aggSeries), ncol = ntest)
+obs_bottom <- revisedmean_bottom <- matrix(NA, nrow =  length(bottomSeries), ncol = ntest)
+
+
 
 for(do.agg in c(TRUE, FALSE)){
   
@@ -42,18 +43,20 @@ for(do.agg in c(TRUE, FALSE)){
     }
     
     idseries <- set_series[j]
-    
-    res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
-    load(res_file)
-    
+ 
+    load(file.path(basef.folder, "REVISED", paste("revised_meanf_", idseries, ".Rdata", sep = "")))
     if(do.agg){
       load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
       obs_agg[j, ] <- demand[test$id]
+      revisedmean_agg[j, ] <- mu_revised_alltest
     }else{
       load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
       obs_bottom[j, ] <- demand[test$id]
+      revisedmean_bottom[j, ] <- mu_revised_alltest
     }
     
+    res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
+    load(res_file)
     for(idtest in seq(ntest)){
       iday <- getInfo(idtest)$iday
       hour <- getInfo(idtest)$hour
@@ -84,7 +87,11 @@ for(idtest in seq(ntest)){
   
   obs_agg_idtest <- obs_agg[, idtest]
   obs_bottom_idtest <- obs_bottom[, idtest]
+  
+  revisedmean_bottom_idtest <- revisedmean_bottom[, idtest]
+  revisedmean_agg_idtest    <- revisedmean_agg[, idtest]
 
   save(file = res_byidtest_file, list = c("QF_agg_idtest", "QF_bottom_idtest", 
-                                          "obs_agg_idtest", "obs_bottom_idtest"))    
+                                          "obs_agg_idtest", "obs_bottom_idtest",
+                                          "revisedmean_agg_idtest", "revisedmean_bottom_idtest"))    
 }
