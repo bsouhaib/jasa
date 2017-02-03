@@ -2,12 +2,15 @@
 
 rscript="aggregation.R"
 
-allijobs=$(seq 1 16 )
+njobs=64
+nperjobs=4416/$njobs
+
+allijobs=$(seq 1 $njobs )
 
 for ijob in ${allijobs[@]}
 do
-  start=$(( 0 + ($ijob - 1)*276 + 1 ))
-  end=$(( 0 + ($ijob - 1)*276 + 276 ))
+  start=$(( 0 + ($ijob - 1) * $nperjobs + 1 ))
+  end=$(( 0 + ($ijob - 1) * $nperjobs + $nperjobs ))
   allidtest=( $(seq $start $end ) )
   
   echo "${allidtest[@]}"

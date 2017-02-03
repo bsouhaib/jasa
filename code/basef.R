@@ -8,8 +8,8 @@ if(length(args) == 0){
   #algo <- c("TBATS")
   #algo <- "DYNREG"
     
-  do.agg <- T
-  alliseries <- 1
+  do.agg <- F
+  alliseries <- c(15)
 }else{
   
   for(i in 1:length(args)){
@@ -71,7 +71,9 @@ for(iseries in alliseries){
   if(algo == "DYNREG"){
     
     do.logtrans <- TRUE
+    do.condvar <- FALSE
     only.insample <- FALSE
+    
 
     fourier.series = function(t,terms,period)
     {
@@ -117,6 +119,7 @@ for(iseries in alliseries){
     
     model_arima <- model_fourier <- model_var <- NULL
     all_qf <- all_mf <- all_sd <- vector("list", nb_futuredays)
+    all_qfe <- all_mu_z_fourier <- all_sd_z_fourier <- vector("list", nb_futuredays)
     mydays <- seq(1, nb_futuredays)
     
     for(id_future_day in mydays){
@@ -150,8 +153,8 @@ for(iseries in alliseries){
       X2past   <- X2[ids_past_actual, ]
       X2future <- X2[ids_future_hours, ]
       
-      #do.fitting <- (id_future_day - 1) %% 7 == 0
-      do.fitting <- TRUE
+      do.fitting <- (id_future_day - 1) %% 7 == 0
+      #do.fitting <- TRUE
       
       if(do.fitting){
         #print("fitting")
@@ -161,15 +164,19 @@ for(iseries in alliseries){
       }
       mu_z_fourier <- as.numeric(predict(model_mu_z_fourier, Xpast))
       efourier <- ypast - mu_z_fourier
-      log_efourier_squared <- as.numeric(log(efourier^2))
       
-      if(do.fitting){
-        cv_var_z_fourier <- cv.glmnet(X2past, log_efourier_squared, nfolds = 3, alpha = 0)
-        best_lamnda_var_z_fourier <- cv_var_z_fourier$lambda[which.min(cv_var_z_fourier$cvm)]
-        model_var_z_fourier <- glmnet(y = log_efourier_squared, x = X2past, alpha = 0, lambda = best_lamnda_var_z_fourier)
+      if(do.condvar){
+        log_efourier_squared <- as.numeric(log(efourier^2))
+        if(do.fitting){
+          cv_var_z_fourier <- cv.glmnet(X2past, log_efourier_squared, nfolds = 3, alpha = 0)
+          best_lamnda_var_z_fourier <- cv_var_z_fourier$lambda[which.min(cv_var_z_fourier$cvm)]
+          model_var_z_fourier <- glmnet(y = log_efourier_squared, x = X2past, alpha = 0, lambda = best_lamnda_var_z_fourier)
+        }
+        var_z_fourier <- exp(as.numeric(predict(model_var_z_fourier, X2past)))
+        efourier_scaled <- efourier/sqrt(var_z_fourier)
+      }else{
+        efourier_scaled <- efourier
       }
-      var_z_fourier <- exp(as.numeric(predict(model_var_z_fourier, X2past)))
-      efourier_scaled <- (ypast - mu_z_fourier)/sqrt(var_z_fourier)
       
       if(do.fitting){
         model_arima <- auto.arima(efourier_scaled, seasonal=FALSE)
@@ -186,12 +193,18 @@ for(iseries in alliseries){
           var_e <- model_arima$sigma2
           
           qf_e <- sapply(seq_along(mu_e), function(i){
-            qnorm(alphas, mean = mu_e[i], sd = sqrt(var_e))
+            qnorm(taus, mean = mu_e[i], sd = sqrt(var_e))
           })
           
-          mu_z <- as.numeric(mu_z_fourier + mu_e * sqrt(var_z_fourier))
-          qf_z <- t(as.numeric(mu_z_fourier) + t(qf_e) * sqrt(var_z_fourier))
-          var_z <- var_e * var_z_fourier
+          if(do.condvar){
+            mu_z <- as.numeric(mu_z_fourier + mu_e * sqrt(var_z_fourier))
+            qf_z <- t(as.numeric(mu_z_fourier) + t(qf_e) * sqrt(var_z_fourier))
+            var_z <- var_e * var_z_fourier
+          }else{
+            mu_z <- as.numeric(mu_z_fourier + mu_e)
+            qf_z <- t(as.numeric(mu_z_fourier) + t(qf_e))
+            var_z <- var_e
+          }
           
           if(do.logtrans){
             mu_y <- backtransform_log(mu_z, var_z)
@@ -201,10 +214,17 @@ for(iseries in alliseries){
             qf_y <- qf_z 
           }
           all_qf_insample <- qf_y
+          #all_qfe_insample <- qf_e
+          
+          all_mu <- mu_y
+          insample_condmean_file <- file.path(insample.folder, algo, paste("condmean_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+          save(file = insample_condmean_file, list = c("all_mu"))
             
           #insample_quantile_file <- file.path(insample.folder, algo, paste("quantiles_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
           #save(file = insample_quantile_file, list = c("all_qf_insample"))
+          #save(file = insample_quantile_file, list = c("all_qfe_insample", "var_z_fourier", "mu_z_fourier"))
           
+           
           #if(only.insample){
           #  stop("INSAMPLE DONE.")
           #}
@@ -218,17 +238,23 @@ for(iseries in alliseries){
         f_arima <- forecast(model_arima, h = 48, level = 95)
         mu_e <- f_arima$mean
         sd_e <- (f_arima$upper-f_arima$lower)/1.96/2
-        qf_e <- matrix(NA, nrow = length(alphas), ncol = 48)
+        qf_e <- matrix(NA, nrow = length(taus), ncol = 48)
         for(h in seq(48))
-          qf_e[,h] <- qnorm(alphas, mu_e[h], sd_e[h])
+          qf_e[,h] <- qnorm(taus, mu_e[h], sd_e[h])
         
         mu_z_fourier  <-  predict(model_mu_z_fourier, Xfuture) 
-        var_z_fourier <- exp(predict(model_var_z_fourier, X2future))
-        sd_z_fourier  <- sqrt(as.numeric(var_z_fourier)) 
+        if(do.condvar){
+          var_z_fourier <- exp(predict(model_var_z_fourier, X2future))
+          sd_z_fourier  <- sqrt(as.numeric(var_z_fourier)) 
         
-        qf_z     <- t(t(qf_e) * sd_z_fourier + as.numeric(mu_z_fourier))
-        mu_z <- as.numeric(mu_e * sd_z_fourier + as.numeric(mu_z_fourier))
-        var_z <-  sd_e^2 * sd_z_fourier^2
+          qf_z     <- t(t(qf_e) * sd_z_fourier + as.numeric(mu_z_fourier))
+          mu_z <- as.numeric(mu_e * sd_z_fourier + as.numeric(mu_z_fourier))
+          var_z <-  sd_e^2 * sd_z_fourier^2
+        }else{
+          qf_z     <- t(t(qf_e) + as.numeric(mu_z_fourier))
+          mu_z <- as.numeric(mu_e + as.numeric(mu_z_fourier))
+          var_z <-  sd_e^2
+        }
         
         if(do.logtrans){
           mu_y <- backtransform_log(mu_z, var_z)
@@ -239,14 +265,21 @@ for(iseries in alliseries){
         }
         all_mf[[id_future_day]] <- mu_y
         all_qf[[id_future_day]] <- qf_y
-      
+        
+        #all_qfe[[id_future_day]] <- qf_e
+        #if(do.condvar){
+          #all_sd_z_fourier[[id_future_day]] <- sd_z_fourier
+        #}
+        #all_mu_z_fourier[[id_future_day]] <- mu_z_fourier
 
     } # test days	
-    
-    save(file = res_file, list = c("all_qf", "all_mf"))
-    
+  
+    list_save <- c("all_qf", "all_mf")
+    # list_save <- c("all_qf", "all_mf", "all_qfe", "all_sd_z_fourier", "all_mu_z_fourier")
+    save(file = res_file, list = list_save)
+
   }else if(algo == "Uncond"){
-    qFlearn <- quantile(demand[learn$id], alphas)
+    qFlearn <- quantile(demand[learn$id], taus)
     qFtest <- matrix(rep(qFlearn, length(test$id)), ncol = length(test$id))
     
     mFlearn <- mean(demand[learn$id])
@@ -288,11 +321,11 @@ for(iseries in alliseries){
     res_testing <- predictkde("testing", selected_bandwiths = selected_bandwiths_ic)
     
     # all_crps <- getItem(res_testing$results, "crps")
-    all_qf  <- getfromlist(res_testing$results, "qtauhat")
-    all_tau <- getfromlist(res_testing$results, "tauhat")
+    all_qf  <- getfromlist(res_testing$results, "q_hat")
     all_mf  <- getfromlist(res_testing$results, "mu_hat")
+    all_varf  <- getfromlist(res_testing$results, "var_hat")
     
-    save(file = res_file, list = c("all_qf", "all_tau", "all_mf"))
+    save(file = res_file, list = c("all_qf", "all_mf", "all_varf"))
     
     ### IN SAMPLE INFO
     res_insample_info <- predictkde("insample_info", selected_bandwiths = selected_bandwiths_ic)
@@ -301,6 +334,8 @@ for(iseries in alliseries){
     all_residuals <- getfromlist(res_insample_info$results, "residuals")
     e_residuals_unscaled <- unlist(all_residuals)
     all_var <- getfromlist(res_insample_info$results, "var_hat")
+    all_mu <- getfromlist(res_insample_info$results, "mu_hat")
+    
     all_varhat <- unlist(all_var)
     e_residuals <- e_residuals_unscaled/sqrt(all_varhat)
     
@@ -309,12 +344,21 @@ for(iseries in alliseries){
     save(file = resid_file, list = c("e_residuals"))
     
     # extract insample quantiles
-    all_qf_insample  <- getfromlist(res_insample_info$results, "qtauhat")
-    all_tau_insample <- getfromlist(res_insample_info$results, "tauhat")
+    all_qf_insample  <- getfromlist(res_insample_info$results, "q_hat")
+
+    all_qfe_insample <- lapply(seq_along(length(all_qf_insample)), function(iday){
+      t((t(all_qf_insample[[iday]]) - all_mu[[iday]])/sqrt(all_var[[iday]]))
+    })
     
+    
+    insample_condmean_file <- file.path(insample.folder, algo, paste("condmean_", idseries, "_", algo, ".Rdata", sep = "")) 
+    save(file = insample_condmean_file, list = c("all_mu"))
+
     #insample_quantile_file <- file.path(insample.folder, algo, paste("quantiles_", idseries, "_", algo, ".Rdata", sep = "")) 
-    #save(file = insample_quantile_file, list = c("all_qf_insample", "all_tau_insample"))
-    
+    #save(file = insample_quantile_file, 
+    #     list = c(all_qfe_insample"))
+    #list = c("all_qf_insample", "all_qfe_insample"))
+
   }else if(algo %in% c("TBATS", "BATS")){
     
     only.resid <- FALSE
@@ -478,10 +522,10 @@ for(iseries in alliseries){
         sd_hat <- (res$upper-res$lower)/1.96/2
         #all_sd[[id_future_day]] <- sd_hat
         
-        qf <- matrix(NA, nrow = length(alphas), ncol = 48)
+        qf <- matrix(NA, nrow = length(taus), ncol = 48)
         for(h in seq(48))
-          qf[,h] <- qnorm(alphas, mu_hat[h], sd_hat[h])
-          #qf[,h] <- qtnorm(alphas, mean= mu_hat[h], sd= sd_hat[h], lower=0, upper=Inf, lower.tail = TRUE, log.p = FALSE)
+          qf[,h] <- qnorm(taus, mu_hat[h], sd_hat[h])
+          #qf[,h] <- qtnorm(taus, mean= mu_hat[h], sd= sd_hat[h], lower=0, upper=Inf, lower.tail = TRUE, log.p = FALSE)
         
         if(do.logtrans){
           qf <- exp(qf)

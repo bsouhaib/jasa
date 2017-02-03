@@ -8,6 +8,9 @@ library(parallel)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
+algo.bottom <- "KD-IC-NML"
+algo.agg <- "DYNREG"
+
 # compute the parsing order of the aggregate nodes
 leaves <- V(itree)[degree(itree, mode="out") == 0]
 agg_nodes <- V(itree)[degree(itree, mode="out") != 0]
@@ -23,11 +26,11 @@ for(inode in seq_along(agg_nodes)){
       isbottom <- (child_node %in% leaves)
       idseries <- names(child_node)
       if(isbottom){
-        resid_file <- file.path(insample.folder, "KD-IC-NML", paste("residuals_", idseries, "_", "KD-IC-NML", ".Rdata", sep = "")) 
+        resid_file <- file.path(insample.folder, algo.bottom, paste("residuals_", idseries, "_", algo.bottom, ".Rdata", sep = "")) 
         load(resid_file)
         e_residuals <- c(rep(NA, n_past_obs_kd), e_residuals)
       }else{
-        resid_file <- file.path(insample.folder, "TBATS", paste("residuals_", idseries, "_", "TBATS", "_", 1, ".Rdata", sep = "")) 
+        resid_file <- file.path(insample.folder, algo.agg, paste("residuals_", idseries, "_", algo.agg, "_", 1, ".Rdata", sep = "")) 
         load(resid_file)
         #e_residuals
       }
@@ -43,39 +46,17 @@ for(inode in seq_along(agg_nodes)){
     # compute ranks by time of day
     n_resid <- nrow(mat_residuals)
     stopifnot(n_resid %% 48 == 0)
-    list_permutations <- list_ties <- vector("list", 48)
-    for(h in seq(48)){
-      
-      ih <- id_all[which(calendar$periodOfDay[id_all] == h)]
-      i_selected <- c(ih - 1, ih, ih + 1)
-      if(h == 1 | h == 48){
-        i_selected <- c(i_selected, tail(ih, 1) - 2)
-      }
-      iremove <- which(!(i_selected %in% id_all))
-      if(length(iremove)>0){
-        i_selected <- i_selected[-iremove]
-      }
-      i_selected <- sort(i_selected)
-      
-      #mat_residuals_h <- mat_residuals[seq(h, n_resid, by = 48), ]
-      mat_residuals_h <- mat_residuals[match(i_selected, id_all), ]
-        
-      # Check ties
-      vec_ties <- sapply(seq(ncol(mat_residuals_h)), function(j){
-        (nrow(mat_residuals_h) - length(unique(mat_residuals_h[, j]))) / nrow(mat_residuals_h)
-      }) * 100
-      #print(max(vec_ties))
-      
-      # rank vs order ???
-      permutations <- apply(mat_residuals_h, 2, rank, ties.method = "random")
-      colnames(permutations) <- names(children_nodes)
-      #print(dim(permutations))
-      stopifnot(nrow(permutations) == M)
-      
-      list_permutations[[h]] <- permutations
-      list_ties[[h]] <- vec_ties
-  
-    }
-    perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, ".Rdata", sep = "")) 
-    save(file = perm_file, list = c("list_permutations", "list_ties"))
+    
+    
+    vec_ties <- sapply(seq(ncol(mat_residuals)), function(j){
+      (nrow(mat_residuals) - length(unique(mat_residuals[, j]))) / nrow(mat_residuals)
+    }) * 100
+    
+    mat_permutations <- apply(mat_residuals, 2, rank, ties.method = "random")
+    colnames(mat_permutations) <- names(children_nodes)
+    #print(dim(permutations))
+    stopifnot(nrow(permutations) == M)
+    
+    perm_file <- file.path(permutations.folder, paste("bisperm_", idseries_agg, ".Rdata", sep = "")) 
+    save(file = perm_file, list = c("mat_permutations", "vec_ties"))
 }

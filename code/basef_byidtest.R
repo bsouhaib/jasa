@@ -10,24 +10,13 @@ library(ff)
 load(file.path(work.folder, "myinfo.Rdata"))
 
 
-algo.agg <- "TBATS"
+algo.agg <- "DYNREG"
 algo.bottom <- "KD-IC-NML"
-print("KD uses 100 quantiles while TBATS uses 21 quantiles")
+print("KD uses 100 quantiles while DYNREG uses 21 quantiles")
 ntest <- length(test$id)
 
-#QF_bottom <- PROB_bottom <- array(NA, c(100, ntest, length(bottomSeries)))
-#QF_bottom <- PROB_bottom <- ff(NA, dim = c(100, ntest, length(bottomSeries)))
-QF_bottom <- PROB_bottom <- vector("list", length(bottomSeries))
-
-if(algo.agg == "KD-IC-NML"){
-  #  QF_agg <- PROB_agg  <- array(NA, c(100, ntest, length(aggSeries)))
-  # QF_agg <- PROB_agg  <- ff(NA, dim = c(100, ntest, length(aggSeries)))
-  QF_agg <- PROB_agg  <- vector("list", length(aggSeries))
-}else{
-  # QF_agg <- array(NA, c(length(alphas), ntest, length(aggSeries)))
-  # QF_agg <- ff(NA, dim = c(length(alphas), ntest, length(aggSeries)))
-  QF_agg <- vector("list", length(aggSeries))
-}
+QF_bottom <- vector("list", length(bottomSeries))
+QF_agg <- vector("list", length(aggSeries))
 
 obs_agg    <- matrix(NA, nrow =  length(aggSeries), ncol = ntest)
 obs_bottom <- matrix(NA, nrow =  length(bottomSeries), ncol = ntest)
@@ -47,15 +36,10 @@ for(do.agg in c(TRUE, FALSE)){
     print(j)
     
     if(do.agg){
-      if(algo.agg == "KD-IC-NML"){
-        QF_agg[[j]] <- PROB_agg[[j]] <- matrix(NA, nrow = 100, ncol = ntest)
-      }else if(algo.agg == "TBATS"){
-        QF_agg[[j]] <- matrix(NA, nrow = length(alphas), ncol = ntest)
-      }
+      QF_agg[[j]] <- matrix(NA, nrow = length(taus), ncol = ntest)
     }else{
-      QF_bottom[[j]] <- PROB_bottom[[j]] <- matrix(NA, nrow = 100, ncol = ntest)
+      QF_bottom[[j]] <- matrix(NA, nrow = length(taus), ncol = ntest)
     }
-    
     
     idseries <- set_series[j]
     
@@ -70,54 +54,25 @@ for(do.agg in c(TRUE, FALSE)){
       obs_bottom[j, ] <- demand[test$id]
     }
     
-    
     for(idtest in seq(ntest)){
-      
       iday <- getInfo(idtest)$iday
       hour <- getInfo(idtest)$hour
       
-      if(algo == "Uncond" || algo == "PeriodOfDay"){
-        #invcdf <- approxfun(alphas, qFtest[, idtest], rule = 2)
-      }else if(algo == "TBATS"){	
-        #invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
-      }else if(algo == "KD-IC-NML"){	
-        tauhat  <- all_tau[[iday]][, hour]
-        qtauhat <- all_qf[[iday]][, hour]
-      }else{
-        stop("error")
-      }
-      
       if(do.agg){
-        if(algo.agg == "KD-IC-NML"){
-          #QF_agg[, idtest, j] <- qtauhat
-          #PROB_agg[, idtest, j] <- tauhat
-          QF_agg[[j]][, idtest] <- qtauhat
-          PROB_agg[[j]][, idtest] <- tauhat
-        }else if(algo.agg == "TBATS"){
-          #QF_agg[, idtest, j] <- all_qf[[iday]][, hour]
-          QF_agg[[j]][, idtest] <- all_qf[[iday]][, hour]
-        }
+        QF_agg[[j]][, idtest] <- all_qf[[iday]][, hour]
       }else{
-        if(algo.bottom == "KD-IC-NML"){
-          #QF_bottom[, idtest, j] <- qtauhat
-          #PROB_bottom[, idtest, j] <- tauhat
-          QF_bottom[[j]][, idtest] <- qtauhat
-          PROB_bottom[[j]][, idtest] <- tauhat
-        }
+        QF_bottom[[j]][, idtest] <- all_qf[[iday]][, hour]
       }
     }# idtest
   }# series
 }# AGG and BOTTOM
 
 #stop("done")
+dir.create(file.path(basef.folder, "byidtest"), recursive = TRUE, showWarnings = FALSE)
 
 for(idtest in seq(ntest)){
   print(idtest)
   res_byidtest_file <- file.path(basef.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = ""))
-  
-  #QF_agg <- QF_agg[, idtest,]
-  #QF_bottom <- QF_bottom[, idtest,]
-  #PROB_bottom <- PROB_bottom[, idtest,]
   
   QF_agg_idtest <- sapply(seq(length(aggSeries)), function(j){
     QF_agg[[j]][, idtest]
@@ -127,24 +82,9 @@ for(idtest in seq(ntest)){
     QF_bottom[[j]][, idtest]
   })
   
-  PROB_bottom_idtest <- sapply(seq(length(bottomSeries)), function(j){
-    PROB_bottom[[j]][, idtest]
-  })
-  
   obs_agg_idtest <- obs_agg[, idtest]
   obs_bottom_idtest <- obs_bottom[, idtest]
-    
-  if(algo.agg == "TBATS" && algo.bottom == "KD-IC-NML"){
-    save(file = res_byidtest_file, list = c("QF_agg_idtest", "QF_bottom_idtest", "PROB_bottom_idtest", 
-                                            "obs_agg_idtest", "obs_bottom_idtest"))
-  }else if(algo.agg == "KD-IC-NML" && algo.bottom == "KD-IC-NML"){
-    #PROB_agg <- PROB_agg[, idtest,]
-    PROB_agg_idtest <- sapply(seq(length(aggSeries)), function(j){
-      PROB_agg[[j]][, idtest]
-    })
-    save(file = res_byidtest_file, list = c("QF_agg_idtest", "PROB_agg_idtest", "QF_bottom_idtest", "PROB_bottom_idtest", 
-                                            "obs_agg_idtest", "obs_bottom_idtest"))
-  }else{
-    stop("error !")
-  }
+
+  save(file = res_byidtest_file, list = c("QF_agg_idtest", "QF_bottom_idtest", 
+                                          "obs_agg_idtest", "obs_bottom_idtest"))    
 }

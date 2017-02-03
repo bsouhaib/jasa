@@ -15,66 +15,62 @@ load(file.path(work.folder, "myinfo.Rdata"))
 nbpast <- 48 * 7 * 4 * 3 + length(validation$id)
 idt <- tail(learn$id, nbpast)
 
-algo.agg <- "TBATS"
+algo.agg <- "DYNREG"
 algo.bottom <- "KD-IC-NML"
 
-myseries <- bottomSeries[100]
-for(idseries in myseries){
+idseries <- bottomSeries[230]
+node <- V(itree)[match(idseries, names(V(itree)))]
+ancestors <- subcomponent(itree, node, mode = "in")[-1]
+siblings_nodes <- ego(itree, order = 1, nodes = ancestors[1], mode = "out")[[1]][-1]
+agg_nodes_needed <- names(ancestors)
+bottom_nodes_needed <- names(siblings_nodes)
+#match(bottom_nodes_needed, bottomSeries)
+#match(agg_nodes_needed, aggSeries)
+regressors_nodes <- c(agg_nodes_needed, bottom_nodes_needed)
+
+load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
+demand_idseries <- demand
   
-  load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
-  demand_idseries <- demand
-  
-  #series_regressors <- c(bottomSeries[1], aggSeries)
-  series_regressors <- c(bottomSeries[100], head(aggSeries, 5))
-  
-  X_hat <- matrix(NA, nrow = nbpast, ncol = length(series_regressors) * 20)
-  for(ireg in seq_along(series_regressors)){
-    idseries_reg <- series_regressors[ireg]
+  X_hat <- matrix(NA, nrow = nbpast, ncol = length(regressors_nodes) * 20)
+  for(ireg in seq_along(regressors_nodes)){
+    idseries_reg <- regressors_nodes[ireg]
     print(idseries_reg)
     
     if(idseries_reg %in% bottomSeries){
       algo <- algo.bottom
     }else if(idseries_reg %in% aggSeries){
-      aogo <- algo.agg
+      algo <- algo.agg
     }
     
     if(algo == "KD-IC-NML"){
-      insamplecdf_file <- file.path(insample.folder, algo, paste("insamplecdf_", idseries, "_", algo, ".Rdata", sep = "")) 
-      load(insamplecdf_file)
+      insample_quantile_file <- file.path(insample.folder, algo, 
+                                          paste("quantiles_", idseries_reg, "_", algo, ".Rdata", sep = "")) 
+    }else if(algo == "DYNREG"){
+      insample_quantile_file <- file.path(residuals.folder, "DYNREG", 
+                                          paste("quantiles_", idseries_reg, "_", algo, "_", 1, ".Rdata", sep = ""))
+    }
       
-      #alldays <- getInfo(tail(learn$id, -n_past_obs_kd))$iday - n_past_obs_kd/48
+    #alldays <- getInfo(tail(learn$id, -n_past_obs_kd))$iday - n_past_obs_kd/48
       
-      res <- lapply(seq_along(all_qf), function(iday){
+    res <- lapply(seq_along(all_qfe), function(iday){
         v <- sapply(seq(48), function(hour){
-          invcdf <- approxfun(all_tau[[iday]][, hour], all_qf[[iday]][, hour], rule = 2)
+          
+          myalphas <- alphas
+          if(algo == "KD-IC-NML"){
+            myalphas <- all_tau_insample[[iday]][, hour]
+          }
+          invcdf <- approxfun(myalphas, all_qfe_insample[[iday]][, hour], rule = 2)
           qf <- invcdf(seq(0.01, 0.99, 0.05))
           qf
         })
         t(v)
       })  
-      mat <- do.call(rbind, res)
-      mat_na <- matrix(rep(rep(NA, 20), n_past_obs_kd), ncol = 20, byrow = T)
-      mat <- rbind(mat_na, mat)
-      mat <- tail(mat, nbpast)
-      
-    }else if(algo == "TBATS"){
-      resid_file <- file.path(residuals.folder, "TBATS", paste("residuals_", idseries_reg, "_", algo, "_", 1, ".Rdata", sep = "")) 
-      load(resid_file)
-     
-      e_tbats <- tail(e_residuals, nbpast)
-      my_var <- mean(e_tbats^2)
-      
-      load(file.path(aggseries.folder, paste("series-", idseries_reg, ".Rdata", sep = "")))
-      demand_ireg <- demand
-      y <- demand_ireg[idt]
-      mu_hat <- y - e_tbats
-      
-      mat <- sapply(mu_hat, function(mu){
-        qnorm(seq(0.01, 0.99, 0.05), mean = mu, sd = sqrt(my_var))
-      })
-      
-     
+    mat <- do.call(rbind, res)
+    if(algo == "KD-IC-NML"){
+        mat_na <- matrix(rep(rep(NA, 20), n_past_obs_kd), ncol = 20, byrow = T)
+        mat <- rbind(mat_na, mat)
     }
+    mat <- tail(mat, nbpast)
     
     X_hat[, (ireg - 1) * 20 + seq(20)] <- mat
     
@@ -84,10 +80,8 @@ for(idseries in myseries){
       lines(z, col = "red")
     }
     
-    
   }# reg
-  
-  
+
   y <- demand_idseries[idt]
   stop("done")
   
@@ -111,8 +105,3 @@ for(idseries in myseries){
   groupMultLambda(X_hat, y, groups, tau = 0.5, lambda, intercept = TRUE, penalty = "LASSO", alg="QICD")
   
   median_hat <- fitted(f)
-  
-}
-
-# are the quantile forecasts for in-sample available for both KD AND TBATS????
-

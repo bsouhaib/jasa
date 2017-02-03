@@ -54,9 +54,9 @@ makeSuperposed<-function(datatable,maxy,colorvar,maintitle=NULL,xlab,ylab,do.plo
 }
 
 ########
-plotQF <- function(quantilef, obs, alphas, id, only.future = FALSE, ...)
+plotQF <- function(quantilef, obs, taus, id, only.future = FALSE, ...)
 {
-  qf <- quantilef[alphas, id]
+  qf <- quantilef[taus, id]
   medianf <- 	quantilef["50%", id]
   future <- obs[id]
   
@@ -82,10 +82,10 @@ plotQF <- function(quantilef, obs, alphas, id, only.future = FALSE, ...)
 }
 
 
-allqs <- function(qf, obs, alphas){
+allqs <- function(qf, obs, taus){
   allqs <- NULL
-  for(id in seq_along(alphas)){
-    alpha <- alphas[id]
+  for(id in seq_along(taus)){
+    alpha <- taus[id]
     #print(alpha)
     qs <- quantileScore(obs, qf[id, ], alpha, breaks = c(-10, union(quantile(qf[id, ]), quantile(qf[id, ])))   )$qs.orig
     allqs <- c(allqs, qs)

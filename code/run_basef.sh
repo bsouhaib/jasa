@@ -2,21 +2,27 @@
 
 rscript="basef.R"
 
-doagg="TRUE"
 
 #if [[ "$doagg" -eq "TRUE" ]]; then
 
+#doagg=TRUE
 #tag="agg"
 #algo="DYNREG"
-#njobs=5
-#nperjobs=11
+#njobs=11
+#nperjobs=5
+#njobs=55
+#nperjobs=1
 
 #elif [[ "$doagg" -eq "FALSE" ]]; then
 
+doagg=FALSE
 tag="bottom"
 algo="KD-IC-NML"
-njobs=16
-nperjobs=99
+
+#njobs=16
+#nperjobs=99
+njobs=64
+nperjobs=25
 
 #fi
 
@@ -31,7 +37,12 @@ do
   
   echo "${alliseries[@]}"
   
-  #Rscript --vanilla $rscript $algo $doagg ${alliseries[@]} > "/home/rstudio/PROJ/rout/outputFile-$tag-$algo-$ijob.Rout" 2> "/home/rstudio/PROJ/rout/errorFile-$tag-$algo-$ijob.Rout"
+  Rscript --vanilla $rscript $algo $doagg ${alliseries[@]} > "/home/rstudio/PROJ/rout/outputFile-$tag-$algo-$ijob.Rout" 2> "/home/rstudio/PROJ/rout/errorFile-$tag-$algo-$ijob.Rout" &
 
 done
+
+
+#Rscript --vanilla basef.R "KD-IC-NML" F 23 40   79   95  134  155  164  203 > "/home/rstudio/PROJ/rout/manual.Rout" 2> "/home/rstudio/PROJ/rout/manual.err" &
+
+
 

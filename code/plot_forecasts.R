@@ -7,19 +7,16 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-do.agg <- T
-alliseries <- c(1)
+do.agg <- F
+alliseries <- c(15)
+#algorithms <- c("DYNREG")
+algorithms <- c("KD-IC-NML")
 
-#mymfrow <- c(3, 2); 
 idays <- seq(1, 92, by = 1)
-tag <- "TAG"; 
-#algorithms <- c("KD-IC-NML", "TBATS")
-#algorithms <- c("KD-IC-NML")
-#algorithms <- c("DYNREG", "KD-IC-NML")
-algorithms <- c("DYNREG")
+tag <- alliseries;
 only.future <- FALSE
 
-savepdf(file.path(results.folder, paste("PLOT_forecasts_ALL", tag, sep = "") ))
+savepdf(file.path(results.folder, paste("PLOT_forecasts_", tag, sep = "") ))
 
 for(iseries in alliseries){
   #savepdf(file.path(results.folder, paste("PLOT_forecasts_", iseries, "_", tag, sep = "") ))
@@ -70,7 +67,7 @@ for(iseries in alliseries){
     load(res_file)
 
     if(algo_load == "KD-IC-NML"){
-      list_load[[ialgo]] <- list(all_qf = all_qf, all_tau = all_tau, all_mf = all_mf) #res_testing
+      list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf) #res_testing
     }else if(algo_load == "TBATS" || algo_load == "DYNREG"){
       list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf)
     }else if(algo_load == "Uncond"){
@@ -100,20 +97,10 @@ for(iseries in alliseries){
         all_mf <- list_load[[ialgo]]$all_mf
         mu_hat <- matrix(unlist(all_mf), ncol = 48, byrow = T)
         
-        if(algo_load == "KD-IC-NML"){
-          all_tau <- list_load[[ialgo]]$all_tau
-          
-          qf_allhours <- sapply(seq(48), function(hour){
-            invcdf <- approxfun(all_tau[[iday]][, hour], all_qf[[iday]][, hour], rule = 2)
-            qf <- invcdf(alphas)
-            qf
-          })
-        
-        }else if(algo_load == "TBATS" || algo_load == "DYNREG"){
-          qf_allhours <- sapply(seq(48), function(hour){
-            qf <- all_qf[[iday]][, hour]
-          })
-        }
+        qf_allhours <- sapply(seq(48), function(hour){
+          qf <- all_qf[[iday]][, hour]
+        })
+
       }else if(algo_load == "Uncond"){
         qFtest <- list_load[[ialgo]]$qFtest
         mFtest <- list_load[[ialgo]]$mFtest
@@ -122,21 +109,21 @@ for(iseries in alliseries){
         mu_hat <- matrix(mFtest, ncol = 48, byrow = T)
       }
 
-      rownames(qf_allhours) <- paste(alphas*100, "%", sep = "")
+      rownames(qf_allhours) <- paste(taus*100, "%", sep = "")
       
       future <- demand[test$id[(iday - 1) * 48 + seq(1, 48)]]
-      subalphas    <- c("5%", "25%", "75%", "95%")
-      #subalphas    <- c("1%", "25%", "75%", "99%")
+      subtaus    <- c("5%", "25%", "75%", "95%")
+      #subtaus    <- c("1%", "25%", "75%", "99%")
       
       mymain <- paste(algo, " - ", 
                         seq_testing_interval[(iday - 1) * 48 + 1], " - ",
                         abbr.dweek[calendar$dweek[test$id[1] + (iday - 1) * 48]],
                         sep = "")
         
-      #myYLIM <- c(0, max(c(future, qf_allhours[subalphas, ]), na.rm = T))	
+      #myYLIM <- c(0, max(c(future, qf_allhours[subtaus, ]), na.rm = T))	
         myYLIM <- c(day_min, day_max)
         
-        plotQF(qf_allhours, future, subalphas, id = seq(48), only.future = only.future,
+        plotQF(qf_allhours, future, subtaus, id = seq(48), only.future = only.future,
                main = mymain, xlab = "Time", ylab = "Electricity demand", xaxt='n', cex.lab = 1.2, ylim = myYLIM)
         axis(1, labels = tday, at = seq(1, 48))
         lines(mu_hat[iday, ], col = "red")

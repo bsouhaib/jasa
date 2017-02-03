@@ -11,6 +11,8 @@ library(igraph)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
+stop(" ATTENTION. I NEED TO PRODUCE THE UNSCALED RESIDUALS FOR BOTH BOTTOM AND AGG ")
+
 algo.bottom  <- "KD-IC-NML"
 algo.agg <- "TBATS"
 

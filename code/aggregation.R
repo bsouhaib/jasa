@@ -54,13 +54,22 @@ load(file.path(work.folder, "myinfo.Rdata"))
 n_bottom <- length(bottomSeries)
 
 algo.bottom  <- "KD-IC-NML"
-algo.agg <- "TBATS"
+algo.agg <- "DYNREG"
 
-covmethod <- c("shrink")
-W1file <- file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", covmethod, ".Rdata", sep = "")) 
-load(W1file)
-J <- Matrix(cbind(matrix(0, nrow = n_bottom, ncol = n_agg), diag(n_bottom)), sparse = TRUE)
-U <- Matrix(rbind(diag(n_agg), -t(Sagg)), sparse = TRUE)
+#bot_methods <- c("BASE", "BASE-MINT")
+#agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "NAIVEBU-MINT", "PERMBU-MINT")
+
+bot_methods <- c("BASE")
+agg_methods <- c("BASE", "NAIVEBU", "PERMBU")
+
+do.mint <- FALSE
+if(do.mint){
+  covmethod <- c("shrink")
+  W1file <- file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", covmethod, ".Rdata", sep = "")) 
+  load(W1file)
+  J <- Matrix(cbind(matrix(0, nrow = n_bottom, ncol = n_agg), diag(n_bottom)), sparse = TRUE)
+  U <- Matrix(rbind(diag(n_agg), -t(Sagg)), sparse = TRUE)
+}
 
 ##########
 # compute the parsing order of the aggregate nodes
@@ -86,6 +95,7 @@ sum_overtest_qscores_agg <- sum_overtest_qscores_bot <- 0
 # Generate samples
 for(idtest in allidtest){
   print(idtest)
+  print(base::date())
   #if(idtest%%48 == 0)
   #{ 
   #  print(idtest)
@@ -125,12 +135,11 @@ for(idtest in allidtest){
       #load(res_file)
       
       if(algo == "Uncond" || algo == "PeriodOfDay"){
-        #invcdf <- approxfun(alphas, qFtest[, idtest], rule = 2)
-      }else if(algo == "TBATS"){	
-        invcdf <- approxfun(alphas, QF_agg_idtest[, j], rule = 2)
-        #invcdf <- approxfun(alphas, all_qf[[iday]][, hour], rule = 2)
+        #
+      }else if(algo == "DYNREG"){	
+        invcdf <- approxfun(taus, QF_agg_idtest[, j], rule = 2)
       }else if(algo == "KD-IC-NML"){	
-        invcdf <- approxfun(PROB_bottom_idtest[, j], QF_bottom_idtest[, j], rule = 2)
+        invcdf <- approxfun(taus, QF_bottom_idtest[, j], rule = 2)
       }else{
         stop("error")
       }
@@ -164,7 +173,7 @@ for(idtest in allidtest){
     perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, ".Rdata", sep = "")) 
     load(perm_file) # c("list_permutations", "list_ties")
     
-    ranks_historical <- list_permutations[[hour]]
+    ranks_historical <- mat_permutations
     stopifnot(all(colnames(ranks_historical) == names(children_nodes)))
     
     depth_node <- depth_aggnodes[match(idseries_agg, names(depth_aggnodes))]
@@ -234,24 +243,36 @@ for(idtest in allidtest){
   
   ###### MINT ############
   #  adjustments 
-  b_hat <- apply(base_samples_bottom, 2, mean)
-  a_hat <- apply(base_samples_agg, 2, mean)
-  y_hat <- c(a_hat, b_hat)
-  adj_bottom <- mint_betastar(W1, y_hat = y_hat)
-  adj_agg    <- Sagg %*% adj_bottom
-  
-  adj_bottom <- as.numeric(adj_bottom)
-  adj_agg    <-  as.numeric(adj_agg)
+  if(do.mint){
+    b_hat <- apply(base_samples_bottom, 2, mean)
+    a_hat <- apply(base_samples_agg, 2, mean)
+    y_hat <- c(a_hat, b_hat)
+    adj_bottom <- mint_betastar(W1, y_hat = y_hat)
+    adj_agg    <- Sagg %*% adj_bottom
+    
+    adj_bottom <- as.numeric(adj_bottom)
+    adj_agg    <-  as.numeric(adj_agg)
+  }
   ########################
   
-  agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "NAIVEBU-MINT", "PERMBU-MINT")
   samples_agg <- array(NA, c(M, n_agg, length(agg_methods)))
-  samples_agg[, , match("BASE", agg_methods)] <- base_samples_agg
-  samples_agg[, , match("NAIVEBU", agg_methods)] <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
-  samples_agg[, , match("PERMBU", agg_methods)] <- t(tcrossprod(Sagg, perm_samples_bottom))
-  
-  samples_agg[, , match("NAIVEBU-MINT", agg_methods)] <- t(t(samples_agg[, , match("NAIVEBU", agg_methods)]) + adj_agg)
-  samples_agg[, , match("PERMBU-MINT", agg_methods)]  <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg)
+  for(iagg_method in seq_along(agg_methods)){
+    agg_method <- agg_methods[iagg_method]
+    if(agg_method == "BASE"){
+      samples_agg_method <- base_samples_agg
+    }else if(agg_method == "NAIVEBU"){
+      samples_agg_method <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
+    }else if(agg_method == "PERMBU"){
+      samples_agg_method <- t(tcrossprod(Sagg, perm_samples_bottom))
+    }else if(agg_method == "NAIVEBU-MINT"){
+      samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU", agg_methods)]) + adj_agg)
+    }else if(agg_method == "PERMBU-MINT"){
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg)
+    }else{
+      stop("error")
+    }
+    samples_agg[, , iagg_method] <- samples_agg_method
+  }
   
   # CRPS
   aggmethods_crps <- compute_crps(agg_methods, n_agg, samples_agg, obs_agg_idtest)
@@ -262,25 +283,34 @@ for(idtest in allidtest){
   sum_overtest_qscores_agg <- sum_overtest_qscores_agg + qscores_agg
     
   ### BOTTOM
-  bot_methods <- c("BASE", "BASE-MINT")
   samples_bot <- array(NA, c(M, n_bottom, length(bot_methods)))
-  samples_bot[, , match("BASE", bot_methods)] <- base_samples_bottom
-  samples_bot[, , match("BASE-MINT", bot_methods)] <- t(t(base_samples_bottom) + adj_bottom)
-  
+  for(ibot_method in seq_along(bot_methods)){
+    bot_method <- bot_methods[ibot_method]
+    if(bot_method == "BASE"){
+      samples_bot_method <- base_samples_bottom
+    }else if(bot_method == "BASE-MINT"){
+      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom)
+    }else{
+      stop("error")
+    }
+    samples_bot[, , ibot_method] <- samples_bot_method
+  }
+
   # CRPS
   botmethods_crps <- compute_crps(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
   list_crps_bot[[idtest]] <- botmethods_crps
   
   # QS
-  qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
-  sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
-}
+  #qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
+  #sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
+}# idtest
 
 avg_qscores_agg <- sum_overtest_qscores_agg/length(allidtest)
-avg_qscores_bot <- sum_overtest_qscores_bot/length(allidtest)
+#avg_qscores_bot <- sum_overtest_qscores_bot/length(allidtest)
 
-res_job <- file.path(loss.folder, "HTS", paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
-save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg", "avg_qscores_bot"))
+res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
+#save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg", "avg_qscores_bot"))
+save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg"))
 
 stop("FINISHED")
 
