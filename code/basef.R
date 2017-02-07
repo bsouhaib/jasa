@@ -73,25 +73,7 @@ for(iseries in alliseries){
     do.logtrans <- TRUE
     do.condvar <- FALSE
     only.insample <- FALSE
-    
 
-    fourier.series = function(t,terms,period)
-    {
-      n = length(t)
-      X = matrix(NA, nrow=n, ncol=2*terms)
-      for(i in 1:terms)
-      {
-        X[,2*i-1] = sin(2*pi*i*t/period)
-        X[,2*i]   = cos(2*pi*i*t/period)
-      }
-      colnames(X) = paste(c("S","C"),rep(1:terms,rep(2,terms)),sep="")
-      return(X)
-    }
-    
-    backtransform_log <- function(x, fvar){
-      exp(x) * (1 + 0.5 * fvar)
-    }
-    
     p1 <- 48
     p2 <- 336
     max_k1 <- p1/2
@@ -182,13 +164,14 @@ for(iseries in alliseries){
         model_arima <- auto.arima(efourier_scaled, seasonal=FALSE)
         if(id_future_day == 1)
         {
+          # insample residuals COPULA
           e_residuals <- resid(model_arima)
 
           dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
           resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
           save(file = resid_file, list = c("e_residuals"))
           
-          # insample quantiles
+          # insample mean and quantiles
           mu_e <- fitted(model_arima)
           var_e <- model_arima$sigma2
           
@@ -216,13 +199,15 @@ for(iseries in alliseries){
           all_qf_insample <- qf_y
           #all_qfe_insample <- qf_e
           
+          # insample mean
           all_mu <- mu_y
           insample_condmean_file <- file.path(insample.folder, algo, paste("condmean_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
           save(file = insample_condmean_file, list = c("all_mu"))
           
+          # residuals MINT
           residuals_MINT <- demand[learn$id] - all_mu 
-          resid_MINT <- file.path(insample.folder, algo, paste("residuals_MINT_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
-          save(file = resid_MINT, list = c("residuals_MINT"))
+          resid_MINT_file <- file.path(insample.folder, algo, paste("residuals_MINT_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+          save(file = resid_MINT_file, list = c("residuals_MINT"))
             
           #insample_quantile_file <- file.path(insample.folder, algo, paste("quantiles_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
           #save(file = insample_quantile_file, list = c("all_qf_insample"))

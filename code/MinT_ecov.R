@@ -11,10 +11,8 @@ library(igraph)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-stop(" ATTENTION. I NEED TO PRODUCE THE UNSCALED RESIDUALS FOR BOTH BOTTOM AND AGG ")
-
 algo.bottom  <- "KD-IC-NML"
-algo.agg <- "TBATS"
+algo.agg <- "DYNREG"
 
 n_bottom <- length(bottomSeries)
 n_total <- n_agg + n_bottom
@@ -35,32 +33,16 @@ for(do.agg in c(TRUE, FALSE)){
     print(j)
     
     idseries <- set_series[j]
-    
     if(algo == "KD-IC-NML"){
-      res_file <- file.path(basef.folder, "KD-IC-NML", paste("results_", idseries, "_", "KD-IC-NML", ".Rdata", sep = "")) 
-      load(res_file)
-      e_residuals <- sapply(tail(learn$id, -n_past_obs_kd), function(id){
-        iday <- getInfo(id)$iday
-        iday <- iday - n_past_obs_kd/48
-        hour <- getInfo(id)$hour
-        
-        if(hour %in% hours_night){
-          index <- match(hour, hours_night)
-          residhat <- res_residuals$res_nighthours[[iday]][[index]]$residuals
-        }else{
-          index <- match(hour, hours_day)
-          residhat <- res_residuals$res_dayhours[[iday]][[index]]$residuals
-        }
-        residhat
-      })
-      e_residuals <- c(rep(NA, n_past_obs_kd), e_residuals)
-      
-    }else if(algo == "TBATS"){
-      resid_file <- file.path(residuals.folder, "TBATS", paste("residuals_", idseries, "_", "TBATS", "_", 1, ".Rdata", sep = "")) 
-      load(resid_file)
-      #e_residuals
+      resid_MINT_file <- file.path(insample.folder, algo, paste("residuals_MINT_", idseries, "_", algo, ".Rdata", sep = "")) 
+      load(resid_MINT_file) # residuals_MINT
+      e_vec <- c(rep(NA, n_past_obs_kd), residuals_MINT)
+    }else if(algo == "DYNREG"){
+      resid_MINT_file <- file.path(insample.folder, algo, paste("residuals_MINT_", idseries, "_", algo, "_", 1, ".Rdata", sep = "")) 
+      load(resid_MINT_file)
+      e_vec <- residuals_MINT
     }
-    e_residuals
+    e_vec
   })
   print(dim(mat_residuals))
   mat_residuals <- tail(mat_residuals, -n_past_obs_kd)

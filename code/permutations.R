@@ -47,16 +47,15 @@ for(inode in seq_along(agg_nodes)){
     n_resid <- nrow(mat_residuals)
     stopifnot(n_resid %% 48 == 0)
     
-    
     vec_ties <- sapply(seq(ncol(mat_residuals)), function(j){
       (nrow(mat_residuals) - length(unique(mat_residuals[, j]))) / nrow(mat_residuals)
     }) * 100
     
+    mat_residuals <- tail(mat_residuals, M) # 5760 instead of 15168
     mat_permutations <- apply(mat_residuals, 2, rank, ties.method = "random")
     colnames(mat_permutations) <- names(children_nodes)
-    #print(dim(permutations))
-    stopifnot(nrow(permutations) == M)
+
     
-    perm_file <- file.path(permutations.folder, paste("bisperm_", idseries_agg, ".Rdata", sep = "")) 
+    perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, ".Rdata", sep = "")) 
     save(file = perm_file, list = c("mat_permutations", "vec_ties"))
 }

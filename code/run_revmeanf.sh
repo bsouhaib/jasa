@@ -1,13 +1,16 @@
 #!/bin/bash
 
-rscript="meancomb.R"
+rscript="revised_meanf.R"
 
+####################
+# NO NEED TO DO THAT
 #doagg=TRUE
 #tag="agg"
 #njobs=11
 #nperjobs=5
 #njobs=55
 #nperjobs=1
+####################
 
 doagg=FALSE
 tag="bottom"
@@ -26,6 +29,6 @@ do
   
   echo "${alliseries[@]}"
   
-  Rscript --vanilla $rscript $doagg ${alliseries[@]} > "/home/rstudio/PROJ/rout/meancomb-$tag-$ijob.Rout" 2> "/home/rstudio/PROJ/rout/meancomb-$tag-$ijob.err" &
+  Rscript --vanilla $rscript $doagg ${alliseries[@]} > "/home/rstudio/PROJ/rout/revmeanf-$ijob.Rout" 2> "/home/rstudio/PROJ/rout/revmeanf-$ijob.err" &
 
 done

@@ -2,6 +2,23 @@
 #  2 * sqrt(varx) * dnorm(mux / sqrt(varx)) + mux * (2 * pnorm(mux / sqrt(varx)) - 1)
 #}
 
+fourier.series = function(t,terms,period)
+{
+  n = length(t)
+  X = matrix(NA, nrow=n, ncol=2*terms)
+  for(i in 1:terms)
+  {
+    X[,2*i-1] = sin(2*pi*i*t/period)
+    X[,2*i]   = cos(2*pi*i*t/period)
+  }
+  colnames(X) = paste(c("S","C"),rep(1:terms,rep(2,terms)),sep="")
+  return(X)
+}
+
+backtransform_log <- function(x, fvar){
+  exp(x) * (1 + 0.5 * fvar)
+}
+
 predictkde <- function(task = c("learning", "testing", "insample_info"), selected_bandwiths = NULL){
 
   n_past_obs <- n_past_obs_kd
