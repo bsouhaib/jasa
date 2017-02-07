@@ -284,7 +284,10 @@ for(idtest in allidtest){
     }
     samples_agg[, , iagg_method] <- samples_agg_method
   }
-  list_samples_agg[[idtest]] <- samples_agg
+  
+  if(idjob %in% c(1, 2, 3, 4, 5)){
+    list_samples_agg[[idtest]] <- samples_agg
+  }
   
   # CRPS
   aggmethods_crps <- compute_crps(agg_methods, n_agg, samples_agg, obs_agg_idtest)
@@ -343,8 +346,10 @@ res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bott
 #save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg", "avg_qscores_bot"))
 save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg", "list_mse_bot", "list_mse_agg"))
 
-samples_job <- file.path(work.folder, "samples_agg", paste("samples_agg_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
-save(file = samples_job, list = c("list_samples_agg"))
+if(idjob %in% c(1, 2, 3, 4, 5)){
+  samples_job <- file.path(work.folder, "samples_agg", paste("samples_agg_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
+  save(file = samples_job, list = c("list_samples_agg"))
+}
 
 stop("FINISHED")
 

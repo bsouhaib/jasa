@@ -183,11 +183,11 @@ myavg_bot <- avg_bot[, match(mybot_methods, bot_methods)]
 matplot( (myavg_bot + myavg_agg)/2, type = 'l', col = color.agg, lty = 1)
 
 # AGG QSCORES
-savepdf(file.path(results.folder, paste("AGG-QSCORES-", comment, sep = "") ))
+savepdf(file.path(results.folder, paste("AGG-QSCORES", sep = "") ))
 par(mfrow = c(2, 2))
 for(iagg in seq(n_agg)){
   matplot(y = total_qscores_agg[, , iagg], x = seq(1, M)/M, lty = 1, type = 'l', cex = .5, 
-          col = color.agg, ylab = "CRPS", xlab = "horizon")
+          col = color.agg, ylab = "QS", xlab = "horizon", main = paste(aggSeries[iagg], " - nb. kids: ", sum(Sagg[iagg, ]), sep = "") )
   legend("topright", agg_methods, col = color.agg, lty = 1, cex = .5)
   #MAT <- cbind(sorted_samples_agg[, iagg,], obs_agg_idtest[iagg])
   #matplot(x = MAT, y = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "red", "blue", "orange", "darkblue"))

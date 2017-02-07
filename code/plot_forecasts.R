@@ -7,12 +7,51 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-do.agg <- F
-alliseries <- c(15)
-#algorithms <- c("DYNREG")
-algorithms <- c("KD-IC-NML")
-
-idays <- seq(1, 92, by = 1)
+plot.permsamples <- TRUE
+if(plot.permsamples){
+  do.agg <- T
+  alliseries <- c(3)
+  idays <- seq(1, 7, by = 1)
+  algorithms <- c("NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MEANCOMB")
+  
+  
+  algo.agg <- "DYNREG"
+  algo.bottom  <- "KD-IC-NML"
+  agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MEANCOMB")
+  nbperjob <- 69
+  
+  QF_agg <- array(NA, c(M, length(algorithms), 69 * 5))
+  for(idjob in c(1, 2, 3, 4, 5)){
+    print(idjob)
+    allidtest <- (idjob - 1) * nbperjob + seq(nbperjob) 
+    
+    samples_job <- file.path(work.folder, "samples_agg", paste("samples_agg_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
+    load(samples_job)
+    #  samples_agg <- array(NA, c(M, n_agg, length(agg_methods)))
+    list_samples_agg_nonull <- list_samples_agg[-which(sapply(list_samples_agg, is.null))]
+    
+    BIGARRAY <- sapply(seq_along(list_samples_agg_nonull),  function(i){list_samples_agg_nonull[[i]]}, simplify = 'array')
+    
+    QF_agg[, , allidtest] <- BIGARRAY[, alliseries, match(algorithms, agg_methods), ]
+  }
+  
+  mf_agg <- apply(QF_agg, c(2, 3), mean)
+  qf_agg <- apply(QF_agg, c(2, 3), quantile, prob = taus)
+  all_qf <- lapply(idays, function(iday){
+    qf_agg[, , (iday - 1) * 48 + seq(48) ]
+  })
+  all_mf <- lapply(idays, function(iday){
+    mf_agg[, (iday - 1) * 48 + seq(48) ]
+  })
+  
+}else{
+  do.agg <- T
+  alliseries <- c(15)
+  #algorithms <- c("DYNREG")
+  algorithms <- c("KD-IC-NML")
+  
+  idays <- seq(1, 92, by = 1)
+}
 tag <- alliseries;
 only.future <- FALSE
 
@@ -56,22 +95,33 @@ for(iseries in alliseries){
     }
     ######
   }
+  
   par(mfrow = c(2, 2))
   list_load <- vector("list", length(algorithms))
   for(ialgo in seq_along(algorithms)){
-    
     algo <- algorithms[ialgo]
     algo_load <- algo
     
-    res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
-    load(res_file)
-
-    if(algo_load == "KD-IC-NML"){
-      list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf) #res_testing
-    }else if(algo_load == "TBATS" || algo_load == "DYNREG"){
-      list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf)
-    }else if(algo_load == "Uncond"){
-      list_load[[ialgo]] <- list(qFtest = qFtest, mFtest = mFtest)
+    if(plot.permsamples){
+      qf <- lapply(idays, function(iday){
+        all_qf[[iday]][, ialgo, ]
+      })
+      mf <- lapply(idays, function(iday){
+        all_mf[[iday]][ialgo, ]
+      })
+      
+      list_load[[ialgo]] <-  list(all_qf = qf, all_mf = mf)
+    }else{
+      res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
+      load(res_file)
+  
+      if(algo_load == "KD-IC-NML"){
+        list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf) #res_testing
+      }else if(algo_load == "TBATS" || algo_load == "DYNREG"){
+        list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf)
+      }else if(algo_load == "Uncond"){
+        list_load[[ialgo]] <- list(qFtest = qFtest, mFtest = mFtest)
+      }
     }
   }#algo
   
@@ -91,15 +141,16 @@ for(iseries in alliseries){
       algo <- algorithms[ialgo]
       algo_load <- algo
       
-      if(algo_load == "KD-IC-NML" || algo_load == "TBATS" || algo_load == "DYNREG"){
+      if(algo_load == "KD-IC-NML" || algo_load == "TBATS" || algo_load == "DYNREG" || plot.permsamples){
         
         all_qf <- list_load[[ialgo]]$all_qf
         all_mf <- list_load[[ialgo]]$all_mf
         mu_hat <- matrix(unlist(all_mf), ncol = 48, byrow = T)
         
-        qf_allhours <- sapply(seq(48), function(hour){
-          qf <- all_qf[[iday]][, hour]
-        })
+        #qf_allhours <- sapply(seq(48), function(hour){
+        #  qf <- all_qf[[iday]][, hour]
+        #})
+        qf_allhours <- all_qf[[iday]]
 
       }else if(algo_load == "Uncond"){
         qFtest <- list_load[[ialgo]]$qFtest
