@@ -9,7 +9,7 @@ if(length(args) == 0){
   #algo <- "DYNREG"
     
   do.agg <- F
-  alliseries <- c(108)
+  alliseries <- c(2)
 }else{
   
   for(i in 1:length(args)){

@@ -22,6 +22,7 @@ source("jasa_utils.R")
 source("utils.R")
 library(igraph)
 library(Matrix)
+library(quadprog)
 
 set.seed(1986)
 
@@ -71,6 +72,11 @@ if(do.mint){
   U <- Matrix(rbind(diag(n_agg), -t(Sagg)), sparse = TRUE)
 }
 
+P_bu <- cbind(matrix(0, nrow = n_bottom, ncol = n_agg), diag(n_bottom))
+n_total <- n_agg + n_bottom
+weights_GTOP <- rep(1, n_agg + n_bottom)
+Rmat <- diag(sqrt(weights_GTOP))
+
 ##########
 # compute the parsing order of the aggregate nodes
 leaves <- V(itree)[degree(itree, mode="out") == 0]
@@ -106,7 +112,8 @@ for(idtest in allidtest){
   
   res_byidtest_file <- file.path(work.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
   load(res_byidtest_file)
-  # "QF_agg_idtest", "QF_bottom_idtest", "PROB_bottom_idtest" "obs_agg_idtest", "obs_bottom_idtest"
+  # "QF_agg_idtest", "QF_bottom_idtest", "obs_agg_idtest", "obs_bottom_idtest", 
+  # "revisedmean_bottom_idtest", 'revisedmean_agg_idtest', "mean_agg_idtest", "mean_bottom_idtest"
   
   iday <- getInfo(idtest)$iday
   hour <- getInfo(idtest)$hour
@@ -261,8 +268,24 @@ for(idtest in allidtest){
   ########################
   # ADJ MEANCOMB
   #stop("done")
-  adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest)
-  adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
+
+  do.gtop <- TRUE
+  if(do.gtop){
+    y_check <- c(revisedmean_agg_idtest, revisedmean_bottom_idtest)
+    rev_and_reconcilied_mean_idtest <- gtop(y_check, Rmat, n_agg, n_total, Sagg, P_bu)
+    rev_and_reconcilied_bottom_mean_idtest <- P_bu %*% rev_and_reconcilied_mean_idtest
+    
+    adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
+    # adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest) + as.numeric(- revisedmean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
+    adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
+    revisedmean_bottom_idtest <- rev_and_reconcilied_bottom_mean_idtest
+  }else{
+    # OLD MEANCOMB
+    adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest)
+    adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
+  }
+  
+  #stop("done")
   
   samples_agg <- array(NA, c(M, n_agg, length(agg_methods)))
   for(iagg_method in seq_along(agg_methods)){
@@ -333,6 +356,8 @@ for(idtest in allidtest){
   mse_matrix_agg[, match("PERMBU-MINT", agg_methods)] <-  (obs_agg_idtest - (Sagg %*% revisedMINT_bottom_idtest))^2
   mse_matrix_agg[, match("PERMBU-MEANCOMB", agg_methods)] <- (obs_agg_idtest - (Sagg %*% revisedmean_bottom_idtest))^2 
   list_mse_agg[[idtest]] <- mse_matrix_agg
+  
+  #print(apply(mse_matrix_agg, 2, mean))
   
   # QS
   #qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)

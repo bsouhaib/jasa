@@ -79,7 +79,7 @@ mse_agg_byhour <- sapply(seq(n_agg), function(iagg){
   })
 }, simplify = 'array')
 
-comment <- "NEW3"
+comment <- ""
 savepdf(file.path(results.folder, paste("AGG-MSE-", comment, sep = "") ), height = 27 * 0.3)
 par(mfrow = c(1, 2))
 set_methods <- vector("list", 2)
@@ -110,7 +110,7 @@ for(ibot in seq(n_bottom)){
 }
 dev.off()
 
-avg_mse_agg <- apply(mse__byhour, c(1, 2), mean)
+avg_mse_agg <- apply(mse_agg_byhour, c(1, 2), mean)
 matplot(avg_mse_agg, type = 'l', col = color.agg, lty = 1)
 
 avg_mse_bot <- apply(mse_bot_byhour, c(1, 2), mean)
@@ -130,7 +130,7 @@ crps_agg_byhour <- sapply(seq(n_agg), function(iagg){
   })
 }, simplify = 'array')
 
-comment <- "NEW3"
+comment <- ""
 savepdf(file.path(results.folder, paste("AGG-CRPS-", comment, sep = "") ), height = 27 * 0.3)
 par(mfrow = c(1, 2))
 set_methods <- vector("list", 2)

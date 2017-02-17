@@ -2,6 +2,21 @@
 #  2 * sqrt(varx) * dnorm(mux / sqrt(varx)) + mux * (2 * pnorm(mux / sqrt(varx)) - 1)
 #}
 
+gtop <- function(ycheck, R, nagg, ntotal, Sagg, P_bu){
+  Rinv <- solve(R) #Rinv <- diag(1 / sqrt(weights_GTOP)) 
+  A <- R
+  A2 <- t(A) %*% A # A2 = R^T %*% R 
+  
+  dvec <- A2 %*% ycheck
+  Dmat <- Rinv
+  Amat <- diag(ntotal)[seq(nagg), ] - Sagg %*% P_bu 
+  meq <- nagg
+  Amat <- t(Amat)
+  res <- solve.QP(Dmat, dvec, Amat, bvec = rep(0, meq), meq = meq, factorized = TRUE)
+  #print(res)
+  yproj <- res$solution
+}
+
 fourier.series = function(t,terms,period)
 {
   n = length(t)
@@ -152,26 +167,38 @@ kde <- function(id_query, ids_data, bandwiths, task){
     #                                & calendar$periodOfDay[ids_data] == calendar$periodOfDay[id_query])  ]
   
     if(calendar$periodOfCycle[id_query] == 1){ # MONDAY TO FRIDAY
-      mycond <- calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] & 
+      is_selected <- calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] & 
         calendar$periodOfDay[ids_data] == calendar$periodOfDay[id_query]
     }else{ # SATURDAY AND SUNDAY
       if(calendar$periodOfDay[id_query] == 1){
-        mycond <- (calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] & 
+        is_selected <- (calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] & 
                      calendar$periodOfDay[ids_data] %in% (calendar$periodOfDay[id_query] + seq(0, 1))) | 
           (calendar$dweek[ids_data] == (calendar$dweek[id_query] - 1) & calendar$periodOfDay[ids_data] == 48)
       }else if(calendar$periodOfDay[id_query] == 48){
-        mycond <- (calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] & 
+        is_selected <- (calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] & 
                      calendar$periodOfDay[ids_data] %in% (calendar$periodOfDay[id_query] + seq(-1, 0))) | 
           (calendar$dweek[ids_data] == (calendar$dweek[id_query]%%7 + 1) & calendar$periodOfDay[ids_data] == 1)
       }else{
-        mycond <- calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] & 
+        is_selected <- calendar$periodOfCycle[ids_data] == calendar$periodOfCycle[id_query] & 
           calendar$periodOfDay[ids_data] %in% (calendar$periodOfDay[id_query] + seq(-1, 1))
       }
     }
-    ids_data_kept <- ids_data[which(mycond)]
+    
+    ids_data_kept <- ids_data[which(is_selected)]
+    n <- length(ids_data_kept)
+    normalized_weights <- rep(1, n)/n
+    
+    do.weighting <- TRUE
+    if(do.weighting){
+     lambda <- 0.8
+     weights_all <- lambda^floor((tail(ids_data) - ids_data)/336)
+     weights_selected <- weights_all[which(is_selected)]
+     normalized_weights <- weights_selected/sum(weights_selected)
+    }
+    #browser()
   }
   # calendar$periodOfDay[ids_data] %in% calendar$periodOfDay[id_query]
-  #print(length(ids_data_kept))
+  # print(length(ids_data_kept))
   
   x <- demand[ids_data_kept]
   ####
@@ -213,7 +240,8 @@ kde <- function(id_query, ids_data, bandwiths, task){
       xi <- x[i]		
       if(mykernel == "normal"){
         #pnorm((xgrid - obs)/h)/(n)
-        pnorm((xgrid - xi)/vech[i])/(n)
+        #pnorm((xgrid - xi)/vech[i])/(n)
+        pnorm((xgrid - xi)/vech[i]) * normalized_weights[i]
       }else if(mykernel == "lognormal"){
         plnorm(xgrid, meanlog = log(xi), sdlog = vech[i], lower.tail = TRUE, log.p = FALSE)/n
       }else if(mykernel == "truncated"){
@@ -234,10 +262,12 @@ kde <- function(id_query, ids_data, bandwiths, task){
         xi + ((dnorm(alpha) - dnorm(beta))*h) / (pnorm(beta) - pnorm(alpha))	
       })
     }
-    mu_hat[i] <- sum(all_mus)/n
+    #mu_hat[i] <- sum(all_mus)/n
+    mu_hat[i] <- sum(all_mus * normalized_weights)
     
     if(mykernel == "normal"){
-      var_hat[i] <- sum(x^2)/n + sum(vech^2)/n - (mu_hat[i])^2
+      #var_hat[i] <- sum(x^2)/n + sum(vech^2)/n - (mu_hat[i])^2
+      var_hat[i] <- sum(normalized_weights * ((x - mu_hat[i])^2 + vech^2))
     }
     
     obs <- demand[id_query]
@@ -247,23 +277,21 @@ kde <- function(id_query, ids_data, bandwiths, task){
     
     if(task != "insample_info"){
       if(mykernel == "normal"){
-        crps[i] <- crps_mixture(x, vech, obs)
+        crps[i] <- crps_mixture(x, vech, normalized_weights, obs)
       }else{
         invkcdf <- approxfun(cdf, xgrid, rule = 2)
-        X1 <- invkcdf(u1)
-        crps[i] <- mean(abs(X1 - obs)) - 0.5 * mean(abs(X1 - invkcdf(u2)))
+        X1 <- invkcdf(runif(1000))
+        crps[i] <- crps_sampling(X1, obs)
+        #crps[i] <- mean(abs(X1 - obs)) - 0.5 * mean(abs(X1 - invkcdf(u2)))
       }
     }
-    
+
     if(task != "learning"){
       invcdf <- approxfun(cdf, xgrid, rule = 2)
       q_hat <- invcdf(taus)
     }
 
   }# bandwiths
-  #browser()
-  
- 
   
   if(task == "learning"){
     ret <- crps #list(crps = crps)
@@ -297,23 +325,28 @@ getInfo <- function(idtest){
   list(iday = iday, hour = hour)
 }
 
-crps_mixture <- function(mus, vars, x_query){
+crps_mixture <- function(mus, vars, weights, x_query){
   M <- length(mus)
   
-  # comp1 <- sum(A(x_query - mus, vars))/M
-  sigmas <- sqrt(vars); x_centered <- (x_query - mus);
-  comp1 <- sum(2 * sigmas * dnorm(x_centered / sigmas) +
-                 x_centered * (2 * pnorm(x_centered / sigmas) - 1))/M
+  sigmas <- sqrt(vars); x_centered <- (x_query - mus)
+  
+  #comp1 <- sum(2 * sigmas * dnorm(x_centered / sigmas) + x_centered * (2 * pnorm(x_centered / sigmas) - 1))/M
+  comp1_part1 <- 2 * sigmas * dnorm(x_centered / sigmas) + x_centered * (2 * pnorm(x_centered / sigmas) - 1)
+  comp1 <- sum(weights * comp1_part1)
   
   ids <- permutations(n = M, r = 2, repeats.allowed=T)
   
   mudiffs <- mus[ids[, 1]] - mus[ids[, 2]]
   varsums <- vars[ids[, 1]] + vars[ids[, 2]]
+  wproducts <- weights[ids[, 1]] * weights[ids[, 2]]
   
-  # comp2 <- (1/M^2) * sum(A(mudiffs, varsums))
-  sigmasums <- sqrt(varsums); 
-  comp2 <- (1/M^2) * sum(2 * sigmasums * dnorm(mudiffs / sigmasums) + 
-                           mudiffs * (2 * pnorm(mudiffs / sigmasums) - 1))
+  sigmasums <- sqrt(varsums)
+  comp2_part1 <- 2 * sigmasums * dnorm(mudiffs / sigmasums) + mudiffs * (2 * pnorm(mudiffs / sigmasums) - 1)
+  comp2 <- sum(wproducts * comp2_part1)
+  
+  #comp2 <- (1/M^2) * sum(2 * sigmasums * dnorm(mudiffs / sigmasums) + 
+  #                         mudiffs * (2 * pnorm(mudiffs / sigmasums) - 1))
+
   comp1 - 0.5 * comp2
 }
 

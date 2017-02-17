@@ -1,8 +1,8 @@
 rm(list = ls())
 args = (commandArgs(TRUE))
 if(length(args) == 0){
-  do.agg <- F
-  alliseries <- c(918, 12)
+  do.agg <- T
+  alliseries <- c(1:55)
 }else{
   
   for(i in 1:length(args)){

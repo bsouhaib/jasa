@@ -7,7 +7,7 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-plot.permsamples <- TRUE
+plot.permsamples <- FALSE
 if(plot.permsamples){
   do.agg <- T
   alliseries <- c(3)
@@ -45,8 +45,8 @@ if(plot.permsamples){
   })
   
 }else{
-  do.agg <- T
-  alliseries <- c(15)
+  do.agg <- F
+  alliseries <- c(2)
   #algorithms <- c("DYNREG")
   algorithms <- c("KD-IC-NML")
   

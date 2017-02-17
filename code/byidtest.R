@@ -43,14 +43,14 @@ for(do.agg in c(TRUE, FALSE)){
     idseries <- set_series[j]
     
     load(file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")))
-    if(!do.agg){
+    #if(!do.agg){
       load(file.path(work.folder, "revisedf", paste("revised_meanf_", idseries, ".Rdata", sep = "")))
-    }
+      #}
     
     if(do.agg){
       load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
       obs_agg[j, ] <- demand[test$id]
-      #revisedmean_agg[j, ] <- mu_revised_alltest
+      revisedmean_agg[j, ] <- mu_revised_alltest
       mean_agg[j, ] <- unlist(all_mf)
     }else{
       load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
@@ -92,13 +92,13 @@ for(idtest in seq(ntest)){
   obs_bottom_idtest <- obs_bottom[, idtest]
   
   revisedmean_bottom_idtest <- revisedmean_bottom[, idtest]
-  #revisedmean_agg_idtest    <- revisedmean_agg[, idtest]
+  revisedmean_agg_idtest    <- revisedmean_agg[, idtest]
   
   mean_bottom_idtest <- mean_bottom[, idtest]
   mean_agg_idtest    <- mean_agg[, idtest]
 
   save(file = res_byidtest_file, list = c("QF_agg_idtest", "QF_bottom_idtest", 
                                           "obs_agg_idtest", "obs_bottom_idtest",
-                                          "revisedmean_bottom_idtest",
+                                          "revisedmean_bottom_idtest", 'revisedmean_agg_idtest',
                                           "mean_agg_idtest", "mean_bottom_idtest"))    
 }

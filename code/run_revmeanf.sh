@@ -3,21 +3,23 @@
 rscript="revised_meanf.R"
 
 ####################
-# NO NEED TO DO THAT
-#doagg=TRUE
-#tag="agg"
-#njobs=11
-#nperjobs=5
+doagg=TRUE
+tag="agg"
+njobs=11
+nperjobs=5
+njobs=2
+nperjobs=28
 #njobs=55
 #nperjobs=1
 ####################
 
-doagg=FALSE
-tag="bottom"
+#doagg=FALSE
+#tag="bottom"
 #njobs=16
 #nperjobs=99
-njobs=64
-nperjobs=25
+
+#njobs=64
+#nperjobs=25
 
 allijobs=$(seq 1 $njobs )
 
@@ -29,6 +31,6 @@ do
   
   echo "${alliseries[@]}"
   
-  Rscript --vanilla $rscript $doagg ${alliseries[@]} > "/home/rstudio/PROJ/rout/revmeanf-$ijob.Rout" 2> "/home/rstudio/PROJ/rout/revmeanf-$ijob.err" &
+  Rscript --vanilla $rscript $doagg ${alliseries[@]} > "/home/rstudio/PROJ/rout/revmeanf-$tag-$ijob.Rout" 2> "/home/rstudio/PROJ/rout/revmeanf-$tag-$ijob.err" &
 
 done
