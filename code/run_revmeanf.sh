@@ -3,23 +3,22 @@
 rscript="revised_meanf.R"
 
 ####################
-doagg=TRUE
-tag="agg"
-njobs=11
-nperjobs=5
-njobs=2
-nperjobs=28
+#doagg=TRUE
+#tag="agg"
+  #njobs=11
+  #nperjobs=5
+  #njobs=2
+  #nperjobs=28
 #njobs=55
 #nperjobs=1
 ####################
 
-#doagg=FALSE
-#tag="bottom"
-#njobs=16
-#nperjobs=99
-
-#njobs=64
-#nperjobs=25
+doagg=FALSE
+tag="bottom"
+  #njobs=16
+  #nperjobs=99
+njobs=64
+nperjobs=25
 
 allijobs=$(seq 1 $njobs )
 

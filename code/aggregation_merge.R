@@ -15,19 +15,32 @@ ntest <- length(test$id)
 n_bottom <- length(bottomSeries)
 
 #nbperjob <- 276
-nbperjob <- 69
+#nbperjob <- 69
+#njobs <- ntest/nbperjob
 
-njobs <- ntest/nbperjob
+nbperjob <- 123
+njobs <- 36
+
 
 #agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "NAIVEBU-MINT", "PERMBU-MINT")
 #color.agg <- c("black", "orange", "darkblue")
 #bot_methods <- c("BASE", "BASE-MINT")
 #color.bot <- c("black")
 
-agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MEANCOMB")
-color.agg <- c("grey", "orange", "cyan", "purple", "darkblue")
-bot_methods <- c("BASE", "BASE-MINT", "BASE-MEANCOMB")
-color.bot <- c("black", "purple", "darkblue")
+#agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MEANCOMB")
+#color.agg <- c("grey", "orange", "cyan", "purple", "darkblue")
+#bot_methods <- c("BASE", "BASE-MINT", "BASE-MEANCOMB")
+#color.bot <- c("black", "purple", "darkblue")
+
+#agg_methods <- c("BASE", "NAIVEBU", "PERMBU")
+#color.agg <- c("grey", "orange", "cyan")
+#bot_methods <- c("BASE", "BASE-MINT")
+#color.bot <- c("black", "purple")
+
+bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
+color.bot <- c("black", "purple", "darkgreen", "darkblue")
+agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
+color.agg <- c("grey", "orange", "cyan", "purple", "darkgreen", "darkblue")
 
 crps_agg    <- array(NA, c(n_agg, ntest, length(agg_methods)))
 crps_bottom <- array(NA, c(n_bottom, ntest, length(bot_methods)))
@@ -40,6 +53,9 @@ total_qscores_agg <- total_qscores_bot <- 0
 for(idjob in seq(njobs)){
   print(idjob)
   allidtest <- (idjob - 1) * nbperjob + seq(nbperjob) 
+  if(nbperjob == 123 && idjob == 36){
+    allidtest <- 4306:4416
+  }
   
   res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
   load(res_job)
@@ -66,11 +82,16 @@ for(idjob in seq(njobs)){
 total_qscores_agg <- total_qscores_agg / njobs
 #total_qscores_bot <- total_qscores_bot / njobs
 
-print("CHECK MSE AS WELL !!!!!")
-
 stop("done")
 # crps_agg   total_qscores_agg
 # crps_bottom total_qscores_bot
+
+set_methods <- vector("list", 2)
+set_methods[[1]] <-  c(2, 3, 5, 6)
+set_methods[[2]] <-  c(1, 4, 5, 6)
+#set_methods <- vector("list", 2)
+#set_methods[[1]] <-  c(1, 2, 3)
+#set_methods[[2]] <-  c(1, 2, 3)
 
 # AGG MSE
 mse_agg_byhour <- sapply(seq(n_agg), function(iagg){
@@ -82,9 +103,7 @@ mse_agg_byhour <- sapply(seq(n_agg), function(iagg){
 comment <- ""
 savepdf(file.path(results.folder, paste("AGG-MSE-", comment, sep = "") ), height = 27 * 0.3)
 par(mfrow = c(1, 2))
-set_methods <- vector("list", 2)
-set_methods[[1]] <-  c(2, 3, 5)
-set_methods[[2]] <-  c(1, 4, 5)
+
 for(iagg in seq(n_agg)){
   for(i in seq_along(set_methods)){
     agg_imethods <- set_methods[[i]]
@@ -130,12 +149,9 @@ crps_agg_byhour <- sapply(seq(n_agg), function(iagg){
   })
 }, simplify = 'array')
 
-comment <- ""
-savepdf(file.path(results.folder, paste("AGG-CRPS-", comment, sep = "") ), height = 27 * 0.3)
+savepdf(file.path(results.folder, paste("AGG-CRPS",sep = "") ), height = 27 * 0.3)
 par(mfrow = c(1, 2))
-set_methods <- vector("list", 2)
-set_methods[[1]] <-  c(2, 3, 5)
-set_methods[[2]] <-  c(1, 4, 5)
+
 for(iagg in seq(n_agg)){
     for(i in seq_along(set_methods)){
       agg_imethods <- set_methods[[i]]
@@ -166,14 +182,19 @@ avg_agg <- apply(crps_agg_byhour, c(1, 2), mean)
 matplot(avg_agg, type = 'l', col = color.agg, lty = 1)
 
 tt <- apply(total_qscores_agg, c(1, 2), mean)
-matplot(tt, col = color.agg, type = "l")
+matplot(tt, col = color.agg, type = "l", lty = 1)
+
+scaled_tt <- sapply(seq_along(agg_methods), function(iaggmethod){
+  (tt[, match("BASE", agg_methods)] - tt[, iaggmethod])/tt[, match("BASE", agg_methods)]
+})
+matplot(scaled_tt, col = color.agg, type = "l", lty = 1)
 
 # AVG BOTTOM CRPS
 avg_bot <- apply(crps_bot_byhour, c(1, 2), mean)
 matplot(avg_bot, type = 'l', col = color.bot, lty = 1)
 
-tt <- apply(total_qscores_bot, c(1, 2), mean)
-matplot(tt, type = 'l', col = color.bot)
+#tt <- apply(total_qscores_bot, c(1, 2), mean)
+#matplot(tt, type = 'l', col = color.bot)
 
 # AVG BOTTOM + AGG CRPS
 mybot_methods <- c("BASE", "BASE", "BASE", "BASE-MINT", "BASE-MEANCOMB")
@@ -205,6 +226,9 @@ for(i in seq(100)){
   #matplot(x = MAT, y = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "magenta"))
 }
 dev.off()
+
+# SKILL QUANTILE SCORE
+
 
 
 ######

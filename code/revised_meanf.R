@@ -1,8 +1,8 @@
 rm(list = ls())
 args = (commandArgs(TRUE))
 if(length(args) == 0){
-  do.agg <- T
-  alliseries <- c(1:55)
+  do.agg <- F
+  alliseries <- c(2)
 }else{
   
   for(i in 1:length(args)){
@@ -32,12 +32,12 @@ load(file.path(work.folder, "myinfo.Rdata"))
 algo.agg <- "DYNREG"
 algo.bottom <- "KD-IC-NML"
 
+do.shrink_towards_base <- FALSE
 
 for(iseries in alliseries){
   
-  # HERE !!!!!!
+   # HERE !!!!!!
   load(file.path(work.folder, "revisedf", paste("revised_meanf_Xmatrix.Rdata", sep = "")))
-  
   
   print(iseries)
   if(do.agg){
@@ -47,11 +47,20 @@ for(iseries in alliseries){
     idseries <- bottomSeries[iseries]
     load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
   }
+  
+  # icol <- match(idseries, allinputSeries)
+  # 
 
   demand_idseries <- demand
   
   y_learn <- demand_idseries[learn$id]
   y_test <- demand_idseries[test$id]
+  
+  if(!do.agg && do.shrink_towards_base){
+    icol <- match(idseries, allinputSeries)
+    y_learn <- y_learn - Xhat_learn[, icol]
+    #y_test <-  y_test - X_test[, icol]
+  }
   
   # remove na
   ikeep <- which(complete.cases(Xhat_learn))
@@ -92,12 +101,17 @@ for(iseries in alliseries){
   # testing
   mu_revised_alltest <- as.numeric(predict(model_final, X_test))
   
+  if(!do.agg && do.shrink_towards_base){
+    mu_revised_alltest <- mu_revised_alltest + X_test[, icol]
+  }
+  #stop("done")
   
   res_file <- file.path(work.folder, "revisedf", paste("revised_meanf_", idseries, ".Rdata", sep = "")) 
   save(file = res_file, list = c("mu_revised_alltest", "model_final"))
 
 }
 
+################
 if(FALSE){
   
   plot.ts(head(y_test, 48*7*2))

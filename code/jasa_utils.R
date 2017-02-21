@@ -34,7 +34,7 @@ backtransform_log <- function(x, fvar){
   exp(x) * (1 + 0.5 * fvar)
 }
 
-predictkde <- function(task = c("learning", "testing", "insample_info"), selected_bandwiths = NULL){
+predictkde <- function(task = c("learning", "testing", "insample_info"), selected_bandwiths = NULL, selected_lambdas = NULL){
 
   n_past_obs <- n_past_obs_kd
   
@@ -98,6 +98,8 @@ predictkde <- function(task = c("learning", "testing", "insample_info"), selecte
   
     nb_futuredays <- length(seq_validation_interval)/48
     
+    lambdas <- c(0.8, 0.9, 0.95, 0.99)
+    
   }else if(task == "testing"){
     stopifnot(length(selected_bandwiths) == 3)
     #ids_past   <- learn$id
@@ -142,19 +144,29 @@ predictkde <- function(task = c("learning", "testing", "insample_info"), selecte
     if(task == "testing" || task == "insample_info"){
       ic_day <-  ic_days[id_future_day]
       bandwiths <- selected_bandwiths[ic_day]
+      lambdas <- selected_lambdas[ic_day]
     }
-    results[[id_future_day]] <- lapply(ids_future_hours, function(id){kde(id, ids_past_actual, bandwiths, task)})
     
+    #  results[[id_future_day]] <- lapply(ids_future_hours, function(id){kde(id, ids_past_actual, bandwiths, lambda, task)})
+    if(length(lambdas) == 1){
+      results[[id_future_day]] <-  lapply(ids_future_hours, function(id){kde(id, ids_past_actual, bandwiths, lambdas, task)})
+    }else{
+      results[[id_future_day]] <- lapply(lambdas, function(lambda){
+      lapply(ids_future_hours, function(id){kde(id, ids_past_actual, bandwiths, lambda, task)})
+     })
+    }
+
+    #browser()
     # 48-hours ahead forecasts
     #res_nighthours[[id_future_day]] <- lapply(ids_future_nighthours, function(id){kde(id, ids_past_actual, bandwiths_nighthours, task)})
     #res_dayhours[[id_future_day]] <- lapply(ids_future_dayhours, function(id){kde(id, ids_past_actual, bandwiths_dayhours, task)})	
   }	
-  list(results = results, bandwiths = bandwiths, ic_days = ic_days)
+  list(results = results, bandwiths = bandwiths, lambdas = lambdas, ic_days = ic_days)
   #list(res_nighthours = res_nighthours, res_dayhours = res_dayhours, 
   #     bandwiths_nighthours = bandwiths_nighthours, bandwiths_dayhours = bandwiths_dayhours)
 }
 
-kde <- function(id_query, ids_data, bandwiths, task){
+kde <- function(id_query, ids_data, bandwiths, lambda, task){
   #print(id_query)
   ####
   if(algo == "KD-U"){
@@ -190,7 +202,6 @@ kde <- function(id_query, ids_data, bandwiths, task){
     
     do.weighting <- TRUE
     if(do.weighting){
-     lambda <- 0.8
      weights_all <- lambda^floor((tail(ids_data) - ids_data)/336)
      weights_selected <- weights_all[which(is_selected)]
      normalized_weights <- weights_selected/sum(weights_selected)

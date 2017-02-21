@@ -9,7 +9,7 @@ if(length(args) == 0){
   #algo <- "DYNREG"
     
   do.agg <- F
-  alliseries <- c(2)
+  alliseries <- c(354)
 }else{
   
   for(i in 1:length(args)){
@@ -290,24 +290,50 @@ for(iseries in alliseries){
     
     ### LEARNING
     res_learning <- predictkde("learning")
+    #stop("done")
+    
+    #results_crps <- sapply(res_learning$results, function(list_vectors){
+    #  sapply(list_vectors, function(vector){
+    #    identity(vector)
+    #    })
+    #  }, simplify = "array") 
+    
+    #ic_days <- res_learning$ic_days
+    
+    #idbest_bandwiths <- NULL
+    #for(ic in seq(3)){
+    #  err <- apply(results_crps[, , which(ic_days == ic)], 1, median)
+    #  idbest_bandwiths <- c(idbest_bandwiths, which.min(err))
+    #}
+    #selected_bandwiths_ic <- res_learning$bandwiths[idbest_bandwiths]
     
     results_crps <- sapply(res_learning$results, function(list_vectors){
-      sapply(list_vectors, function(vector){identity(vector)
-        })
-      }, simplify = "array") 
+        sapply(list_vectors, function(list_two){
+          sapply(list_two, function(vector){
+            identity(vector)
+          }, simplify = "array")
+          
+          }, simplify = "array")
+        }, simplify = "array") 
+    
     ic_days <- res_learning$ic_days
     
-    idbest_bandwiths <- NULL
+    idbest_bandwiths <- idbest_lambda <- NULL
     for(ic in seq(3)){
-      err <- apply(results_crps[, , which(ic_days == ic)], 1, median)
-      idbest_bandwiths <- c(idbest_bandwiths, which.min(err))
+      err <- apply(results_crps[, , , which(ic_days == ic)], c(1, 3), median)
+      idbest <- which(err == min(err), arr.ind = T)
+      #print(err)
+      #print(idbest)
+      idbest_bandwiths <- c(idbest_bandwiths, idbest[1, 1])
+      idbest_lambda    <- c(idbest_lambda, idbest[1, 2])
     }
     selected_bandwiths_ic <- res_learning$bandwiths[idbest_bandwiths]
+    selected_lambdas_ic <- res_learning$lambdas[idbest_lambda]
     
     # boxplot(apply(results_crps[, , which(ic_days == ic)], 1, identity), outline = F)
     
     ### TESTING
-    res_testing <- predictkde("testing", selected_bandwiths = selected_bandwiths_ic)
+    res_testing <- predictkde("testing", selected_bandwiths = selected_bandwiths_ic, selected_lambdas = selected_lambdas_ic)
     
     # all_crps <- getItem(res_testing$results, "crps")
     all_qf  <- getfromlist(res_testing$results, "q_hat")
@@ -317,7 +343,7 @@ for(iseries in alliseries){
     save(file = res_file, list = c("all_qf", "all_mf", "all_varf"))
     
     ### IN SAMPLE INFO
-    res_insample_info <- predictkde("insample_info", selected_bandwiths = selected_bandwiths_ic)
+    res_insample_info <- predictkde("insample_info", selected_bandwiths = selected_bandwiths_ic, selected_lambdas = selected_lambdas_ic)
 
     # residuals
     all_residuals <- getfromlist(res_insample_info$results, "residuals")

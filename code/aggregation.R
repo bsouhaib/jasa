@@ -5,9 +5,9 @@ if(length(args) == 0){
   allidtest <- 1:4 #1:1104
 }else{
   
-  for(i in 1:length(args)){
-    print(args[[i]])
-  }
+  #for(i in 1:length(args)){
+  #  print(args[[i]])
+  #}
   
   idjob <- as.numeric(args[[1]])
   allidtest <- NULL
@@ -50,6 +50,12 @@ compute_qscores <- function(methods, n, mat_samples, observations){
   qscores
 }
 
+if(idjob == 36){
+  allidtest <- 4306:4416
+}
+
+print(allidtest)
+
 
 load(file.path(work.folder, "myinfo.Rdata"))
 n_bottom <- length(bottomSeries)
@@ -57,13 +63,15 @@ n_bottom <- length(bottomSeries)
 algo.bottom  <- "KD-IC-NML"
 algo.agg <- "DYNREG"
 
-bot_methods <- c("BASE", "BASE-MINT", "BASE-MEANCOMB")
-agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MEANCOMB")
+bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
+agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
 
-#bot_methods <- c("BASE")
+#bot_methods <- c("BASE", "BASE-MINT")
 #agg_methods <- c("BASE", "NAIVEBU", "PERMBU")
 
-do.mint <- TRUE
+do.mint <- any(c(grepl("MINT", bot_methods), grepl("MINT", agg_methods)))
+do.myrevmean <- any(c(grepl("MCOMB", bot_methods), grepl("MCOMB", agg_methods)))
+
 if(do.mint){
   covmethod <- c("shrink")
   W1file <- file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", covmethod, ".Rdata", sep = "")) 
@@ -171,16 +179,18 @@ for(idtest in allidtest){
   mat_test <- NULL
   # PERM-BU
   for(inode in seq_along(ordered_agg_nodes)){
-    
+
     agg_node <- ordered_agg_nodes[inode]
     idseries_agg <- names(agg_node)
     iagg <- match(idseries_agg, aggSeries)
     children_nodes <- ego(itree, order = 1, nodes = agg_node, mode = "out")[[1]][-1]
     nkids <- length(children_nodes)
     
+    
     # load permutation file
     perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, ".Rdata", sep = "")) 
     load(perm_file) # c("list_permutations", "list_ties")
+    
     
     ranks_historical <- mat_permutations
     stopifnot(all(colnames(ranks_historical) == names(children_nodes)))
@@ -264,54 +274,122 @@ for(idtest in allidtest){
     
     adj_bottom_MINT <- as.numeric(adj_bottom_MINT)
     adj_agg_MINT    <-  as.numeric(adj_agg_MINT)
-  }
+    
+    revisedMINT_bottom_idtest <- mean_bottom_idtest + adj_bottom_MINT
+    #print("MINT done")
+    #print(base::date())
+   }
   ########################
   # ADJ MEANCOMB
   #stop("done")
+  
+  if(do.myrevmean){
+    new.gtop <- TRUE
+    if(new.gtop){
+      y_check <- c(revisedmean_agg_idtest, revisedmean_bottom_idtest)
+      rev_and_reconcilied_mean_idtest <- gtop(y_check, Rmat, n_agg, n_total, Sagg, P_bu)
+      rev_and_reconcilied_bottom_mean_idtest <- P_bu %*% rev_and_reconcilied_mean_idtest
+      
+      # adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
+      # adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest) + as.numeric(- revisedmean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
+      # adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
+      #revisedmean_bottom_idtest <- rev_and_reconcilied_bottom_mean_idtest
+      
+      adj_bottom_mcomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest)
+      adj_agg_mcomb    <- as.numeric(Sagg %*% adj_bottom_mcomb)
+        
+      adj_bottom_mcombrecon <- as.numeric(-mean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
+      adj_agg_mcombrecon    <- as.numeric(Sagg %*% adj_bottom_mcombrecon)
 
-  do.gtop <- TRUE
-  if(do.gtop){
-    y_check <- c(revisedmean_agg_idtest, revisedmean_bottom_idtest)
-    rev_and_reconcilied_mean_idtest <- gtop(y_check, Rmat, n_agg, n_total, Sagg, P_bu)
-    rev_and_reconcilied_bottom_mean_idtest <- P_bu %*% rev_and_reconcilied_mean_idtest
-    
-    adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
-    # adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest) + as.numeric(- revisedmean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
-    adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
-    revisedmean_bottom_idtest <- rev_and_reconcilied_bottom_mean_idtest
-  }else{
-    # OLD MEANCOMB
-    adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest)
-    adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
+   
+     }else{
+      # OLD MEANCOMB
+      adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest)
+      adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
+     }
+    #print("MCOMB done")
+    #print(base::date())
   }
   
   #stop("done")
   
+  ######################## BOTTOM
+  samples_bot <- array(NA, c(M, n_bottom, length(bot_methods)))
+  meanf_bot   <- matrix(NA, nrow = n_bottom, ncol = length(bot_methods))
+  for(ibot_method in seq_along(bot_methods)){
+    bot_method <- bot_methods[ibot_method]
+    if(bot_method == "BASE"){
+      samples_bot_method <- base_samples_bottom
+      meanf_bot_method <- mean_bottom_idtest
+    }else if(bot_method == "BASE-MINT"){
+      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_MINT)
+      meanf_bot_method <- revisedMINT_bottom_idtest
+    }else if(bot_method == "BASE-MCOMB"){
+      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_mcomb)
+      meanf_bot_method <- revisedmean_bottom_idtest
+    }else if(bot_method == "BASE-MCOMBRECON"){
+      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_mcombrecon)
+      meanf_bot_method <- rev_and_reconcilied_bottom_mean_idtest
+    }else{
+      stop("error")
+    }
+    samples_bot[, , ibot_method] <- samples_bot_method
+    meanf_bot[, ibot_method] <- meanf_bot_method
+  }
+  
+  # MSE
+  mse_matrix_bottom <- (meanf_bot - obs_bottom_idtest)^2
+  list_mse_bot[[idtest]] <- mse_matrix_bottom
+  
+  # CRPS
+  botmethods_crps <- compute_crps(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
+  list_crps_bot[[idtest]] <- botmethods_crps
+  
+  # QS
+  #qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
+  #sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
+  
+  ######################## AGG
   samples_agg <- array(NA, c(M, n_agg, length(agg_methods)))
+  meanf_agg   <- matrix(NA, nrow = n_agg, ncol = length(agg_methods))
+  
   for(iagg_method in seq_along(agg_methods)){
     agg_method <- agg_methods[iagg_method]
     if(agg_method == "BASE"){
       samples_agg_method <- base_samples_agg
+      meanf_agg_method <- mean_agg_idtest
     }else if(agg_method == "NAIVEBU"){
       samples_agg_method <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
+      meanf_agg_method <- (Sagg %*% mean_bottom_idtest)
     }else if(agg_method == "PERMBU"){
       samples_agg_method <- t(tcrossprod(Sagg, perm_samples_bottom))
+      meanf_agg_method <- (Sagg %*% mean_bottom_idtest)
     #}else if(agg_method == "NAIVEBU-MINT"){
     #  samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU", agg_methods)]) + adj_agg_MINT)
     }else if(agg_method == "PERMBU-MINT"){
       samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_MINT)
-    }else if(agg_method == "PERMBU-MEANCOMB"){
-      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_meancomb)
+      meanf_agg_method <- (Sagg %*% revisedMINT_bottom_idtest)
+    }else if(agg_method == "PERMBU-MCOMB"){
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcomb)
+      meanf_agg_method <- (Sagg %*% revisedmean_bottom_idtest)
+    }else if(agg_method == "PERMBU-MCOMBRECON"){
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcombrecon)
+      meanf_agg_method <- (Sagg %*% rev_and_reconcilied_bottom_mean_idtest)
     }else{
       stop("error")
     }
     samples_agg[, , iagg_method] <- samples_agg_method
+    meanf_agg[, iagg_method] <- meanf_agg_method
   }
   
   if(idjob %in% c(1, 2, 3, 4, 5)){
     list_samples_agg[[idtest]] <- samples_agg
   }
   
+  # MSE
+  mse_matrix_agg    <- (meanf_agg - obs_agg_idtest)^2
+  list_mse_agg[[idtest]] <- mse_matrix_agg
+
   # CRPS
   aggmethods_crps <- compute_crps(agg_methods, n_agg, samples_agg, obs_agg_idtest)
   list_crps_agg[[idtest]] <- aggmethods_crps
@@ -319,49 +397,8 @@ for(idtest in allidtest){
   # QS
   qscores_agg <- compute_qscores(agg_methods, n_agg, samples_agg, obs_agg_idtest)
   sum_overtest_qscores_agg <- sum_overtest_qscores_agg + qscores_agg
-    
-  ### BOTTOM
-  samples_bot <- array(NA, c(M, n_bottom, length(bot_methods)))
-  for(ibot_method in seq_along(bot_methods)){
-    bot_method <- bot_methods[ibot_method]
-    if(bot_method == "BASE"){
-      samples_bot_method <- base_samples_bottom
-    }else if(bot_method == "BASE-MINT"){
-      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_MINT)
-    }else if(bot_method == "BASE-MEANCOMB"){
-      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_meancomb)
-    }else{
-      stop("error")
-    }
-    samples_bot[, , ibot_method] <- samples_bot_method
-  }
-
-  # CRPS
-  botmethods_crps <- compute_crps(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
-  list_crps_bot[[idtest]] <- botmethods_crps
   
-  # MSE
-  mse_matrix_bottom <- matrix(NA, nrow = n_bottom, ncol = length(bot_methods))
-  mse_matrix_agg    <- matrix(NA, nrow = n_agg, ncol = length(agg_methods))
-  
-  mse_matrix_bottom[, match("BASE", bot_methods)] <- (obs_bottom_idtest - mean_bottom_idtest)^2
-  revisedMINT_bottom_idtest <- mean_bottom_idtest + adj_bottom_MINT
-  mse_matrix_bottom[, match("BASE-MINT", bot_methods)] <- (obs_bottom_idtest - revisedMINT_bottom_idtest)^2 
-  mse_matrix_bottom[, match("BASE-MEANCOMB", bot_methods)] <- (obs_bottom_idtest - revisedmean_bottom_idtest)^2  
-  list_mse_bot[[idtest]] <- mse_matrix_bottom
-  
-  mse_matrix_agg[, match("BASE", agg_methods)] <- (obs_agg_idtest - mean_agg_idtest)^2  
-  mse_matrix_agg[, match("NAIVEBU", agg_methods)] <- (obs_agg_idtest - (Sagg %*% mean_bottom_idtest))^2  
-  mse_matrix_agg[, match("PERMBU", agg_methods)] <- (obs_agg_idtest - (Sagg %*% mean_bottom_idtest))^2  
-  mse_matrix_agg[, match("PERMBU-MINT", agg_methods)] <-  (obs_agg_idtest - (Sagg %*% revisedMINT_bottom_idtest))^2
-  mse_matrix_agg[, match("PERMBU-MEANCOMB", agg_methods)] <- (obs_agg_idtest - (Sagg %*% revisedmean_bottom_idtest))^2 
-  list_mse_agg[[idtest]] <- mse_matrix_agg
-  
-  #print(apply(mse_matrix_agg, 2, mean))
-  
-  # QS
-  #qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
-  #sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
+  #print(base::date())
 }# idtest
 
 avg_qscores_agg <- sum_overtest_qscores_agg/length(allidtest)

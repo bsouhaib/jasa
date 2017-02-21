@@ -2,10 +2,14 @@
 
 rscript="aggregation.R"
 
-njobs=64
-nperjobs=4416/$njobs
+  #njobs=64
+  #nperjobs=4416/$njobs
+njobs=36
+nperjobs=123
+  #nperjobs=4416/$njobs
 
-allijobs=$(seq 1 $njobs )
+#allijobs=$(seq 1 $njobs )
+allijobs=(5)
 
 for ijob in ${allijobs[@]}
 do
