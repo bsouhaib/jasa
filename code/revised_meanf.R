@@ -32,12 +32,27 @@ load(file.path(work.folder, "myinfo.Rdata"))
 algo.agg <- "DYNREG"
 algo.bottom <- "KD-IC-NML"
 
-do.shrink_towards_base <- FALSE
+do.shrink_towards_base <- TRUE
+include.calendar <- TRUE
+use.intercept <- TRUE
 
 for(iseries in alliseries){
   
    # HERE !!!!!!
   load(file.path(work.folder, "revisedf", paste("revised_meanf_Xmatrix.Rdata", sep = "")))
+  
+  
+  if(!include.calendar){
+    Xhat_learn <- Xhat_learn[, -(ncol(Xhat_learn) - 0:1) ]
+    X_test <- X_test[, -(ncol(Xhat_learn) - 0:1) ]
+    my_penalty <- rep(1, ncol(Xhat_learn))
+  }else{
+    #my_penalty <- rep(1, ncol(Xhat_learn))
+    #my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), rep(0, nvar_additional))
+    
+    #my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), 0, 1) # time of year can be penalized
+    my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), 1, 1)
+  }
   
   print(iseries)
   if(do.agg){
@@ -77,8 +92,6 @@ for(iseries in alliseries){
   Xhat_valid <- Xhat_learn[ivalid, ]; y_valid <- y_learn[ivalid]
   
   myalpha <- .95
-  use.intercept <- TRUE
-  
   
   model <- glmnet(y = y_train, x = Xhat_train, alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept)
   pred <- predict(model, Xhat_valid)
@@ -104,7 +117,8 @@ for(iseries in alliseries){
   if(!do.agg && do.shrink_towards_base){
     mu_revised_alltest <- mu_revised_alltest + X_test[, icol]
   }
-  #stop("done")
+  
+  stop("done")
   
   res_file <- file.path(work.folder, "revisedf", paste("revised_meanf_", idseries, ".Rdata", sep = "")) 
   save(file = res_file, list = c("mu_revised_alltest", "model_final"))

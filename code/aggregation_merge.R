@@ -37,10 +37,20 @@ njobs <- 36
 #bot_methods <- c("BASE", "BASE-MINT")
 #color.bot <- c("black", "purple")
 
+#bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
+#color.bot <- c("black", "purple", "darkgreen", "darkblue")
+#agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
+#color.agg <- c("grey", "orange", "cyan", "purple", "darkgreen", "darkblue")
+
 bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
 color.bot <- c("black", "purple", "darkgreen", "darkblue")
-agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
-color.agg <- c("grey", "orange", "cyan", "purple", "darkgreen", "darkblue")
+agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON")
+color.agg <- c("black", "orange", "cyan", "purple", "darkgreen", "darkblue", "red")
+
+agg_better_names <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2", "PERMBU-COMB")
+bot_better_names <- c("BASE", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2")
+
+
 
 crps_agg    <- array(NA, c(n_agg, ntest, length(agg_methods)))
 crps_bottom <- array(NA, c(n_bottom, ntest, length(bot_methods)))
@@ -53,6 +63,7 @@ total_qscores_agg <- total_qscores_bot <- 0
 for(idjob in seq(njobs)){
   print(idjob)
   allidtest <- (idjob - 1) * nbperjob + seq(nbperjob) 
+  
   if(nbperjob == 123 && idjob == 36){
     allidtest <- 4306:4416
   }
@@ -86,19 +97,131 @@ stop("done")
 # crps_agg   total_qscores_agg
 # crps_bottom total_qscores_bot
 
-set_methods <- vector("list", 2)
-set_methods[[1]] <-  c(2, 3, 5, 6)
-set_methods[[2]] <-  c(1, 4, 5, 6)
-#set_methods <- vector("list", 2)
-#set_methods[[1]] <-  c(1, 2, 3)
-#set_methods[[2]] <-  c(1, 2, 3)
-
 # AGG MSE
 mse_agg_byhour <- sapply(seq(n_agg), function(iagg){
   sapply(seq_along(agg_methods), function(imethod){
     apply(matrix(mse_agg[iagg, , imethod], ncol = 48, byrow = T), 2, mean)
   })
 }, simplify = 'array')
+
+# BOT MSE
+mse_bot_byhour <- sapply(seq(n_bottom), function(ibot){
+  sapply(seq_along(bot_methods), function(imethod){
+    apply(matrix(mse_bottom[ibot, , imethod], ncol = 48, byrow = T), 2, mean)
+  })
+}, simplify = 'array')
+
+# BOT CRPS
+crps_bot_byhour <- sapply(seq(n_bottom), function(ibot){
+  sapply(seq_along(bot_methods), function(imethod){
+    apply(matrix(crps_bottom[ibot, , imethod], ncol = 48, byrow = T), 2, mean)
+  })
+}, simplify = 'array')
+
+# AGG CRPS
+crps_agg_byhour <- sapply(seq(n_agg), function(iagg){
+  sapply(seq_along(agg_methods), function(imethod){
+    apply(matrix(crps_agg[iagg, , imethod], ncol = 48, byrow = T), 2, mean)
+  })
+}, simplify = 'array')
+
+##################
+# FIGURE ICML
+
+mymethods_agg <- c("BASE", "NAIVEBU",  "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
+#mymethods <- c("BASE", "NAIVEBU",  "PERMBU", "PERMBU-MINT", "PERMBU-MCOMBRECON")
+
+#mymethods_bot <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
+mymethods_bot <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
+
+do.skill <- FALSE
+do.icml <- TRUE
+myidsagg <- match(mymethods_agg, agg_methods)
+myidsbot <- match(mymethods_bot, bot_methods)
+
+#savepdf(file.path(results.folder, paste("ICML-RES", sep = "") ), width = 21 , height = 29.7 * 0.2)
+savepdf(file.path(results.folder, paste("ICML-RES", sep = "") ), width = 21 * 0.6 , height = 29.7 * 0.4)
+
+if(do.icml){
+  #par(mfrow = c(1, 4))
+  par(mfrow = c(2, 2))
+}else{
+  par(mfrow = c(1, 3))
+}
+avg_qs_agg <- apply(total_qscores_agg, c(1, 2), mean)
+avg_agg <- apply(crps_agg_byhour, c(1, 2), mean)
+avg_bot <- apply(crps_bot_byhour, c(1, 2), mean)
+
+skillcrps_agg <- sapply(myidsagg, function(iaggmethod){
+  (avg_agg[, match("BASE", agg_methods)] - avg_agg[, iaggmethod])/avg_agg[, match("BASE", agg_methods)]
+})
+skillqs_agg <- sapply(myidsagg, function(iaggmethod){
+  (avg_qs_agg[, match("BASE", agg_methods)] - avg_qs_agg[, iaggmethod])/avg_qs_agg[, match("BASE", agg_methods)]
+})
+skillcrps_bot <- sapply(myidsbot, function(ibotgmethod){
+  (avg_bot[, match("BASE", bot_methods)] - avg_bot[, ibotgmethod])/avg_bot[, match("BASE", bot_methods)]
+})
+
+if(do.skill){
+  
+  
+  matplot(skillcrps_agg, col = color.agg[myidsagg], type = "l", lty = 1, ylab = "Skill CRPS", xlab = "Horizon",  main = "Aggregate levels")
+  matplot(x = q_probs, y = skillqs_agg, col = color.agg[myidsagg], type = "l", lty = 1, ylab = "Skill QS", xlab = "Horizon",  main = "Aggregate levels")
+  matplot(skillcrps_bot, col = color.bot[myidsbot], type = "l", lty = 1, main = "Bottom level")
+  
+}else{
+  
+  if(do.icml){
+    set_one <- match(c("BASE", "NAIVEBU", "PERMBU"), agg_methods)
+    #set_two <- match(c("BASE", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON"), agg_methods)
+    set_two <- match(c("BASE", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON"), agg_methods)
+
+    #matplot(avg_agg[, union(set_one, set_two) ], ylab = "CRPS", xlab = "Horizon", main = "Aggregate levels", type = "n")
+    #matlines(avg_agg[, set_one], col = color.agg[set_one], lty = 1)
+    #legend(20, 0.9, agg_methods[set_one], col = color.agg[set_one], lty = 1, cex = 0.4)
+    #matplot(avg_agg[, union(set_one, set_two) ], ylab = "CRPS", xlab = "Horizon", main = "Aggregate levels", type = "n")
+    #matlines(avg_agg[, set_two], col = color.agg[set_two], lty = 1)
+    #legend(20, 0.9, agg_methods[set_two], col = color.agg[set_two], lty = 1, cex = 0.4)
+    
+    
+    matplot(skillcrps_agg[, union(set_one, set_two) ], ylab = "Skill CRPS", xlab = "Hour of the day", main = "Aggregate levels", type = "n", xaxt = "n")
+    axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8), cex.axis =  0.6)
+    matlines(skillcrps_agg[, set_one], col = color.agg[set_one], lty = 1)
+    
+    #legend(20, -0.4, agg_methods[set_one], col = color.agg[set_one], lty = 1, cex = 0.7)
+    legend(15, -0.3, agg_better_names[set_one], col = color.agg[set_one], lty = 1, cex = 0.6)
+     
+    matplot(skillcrps_agg[, union(set_one, set_two) ], ylab = "Skill CRPS", xlab = "Hour of the day", main = "Aggregate levels", type = "n", xaxt = "n")
+    axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8), cex.axis = 0.6)
+    matlines(skillcrps_agg[, set_two], col = color.agg[set_two], lty = 1)
+    
+    #legend(20, -0.4, agg_methods[set_two], col = color.agg[set_two], lty = 1, cex = 0.7)
+    legend(15, -0.2, agg_better_names[set_two], col = color.agg[set_two], lty = 1, cex = 0.6)
+    
+  }else{
+    matplot(avg_agg[, myidsagg], type = 'l', col = color.agg[myidsagg], lty = 1, ylab = "CRPS", xlab = "Hour of the day", main = "Aggregate levels")
+    legend("topleft", agg_methods[myidsagg], col = color.agg[myidsagg], lty = 1, cex = 0.3)
+  }
+  
+  matplot(x = q_probs, y = avg_qs_agg[, myidsagg], col = color.agg[myidsagg], type = 'l', lty = 1, ylab = "QS", xlab = "Probability level", main = "Aggregate levels", 
+          cex.axis = 0.6)
+  #matplot(avg_bot[, myidsbot], type = 'l', col = color.bot, lty = 1, ylab = "CRPS", xlab = "Hour of the day", main = "Bottom level")
+  
+  #matplot(x = q_probs, y = skillqs_agg[, myidsagg], col = color.agg[myidsagg], type = 'l', lty = 1, ylab = "Skill QS", xlab = "Probability level", main = "Aggregate levels")
+  matplot(skillcrps_bot[, myidsbot], type = 'l', col = color.bot, lty = 1, ylab = "Skill CRPS", xlab = "Hour of the day", main = "Bottom level", xaxt = "n")
+  axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8), cex.axis = 0.6)
+}
+
+dev.off()
+##################
+
+
+set_methods <- vector("list", 2)
+set_methods[[1]] <-  c(2, 3, 5, 6)
+set_methods[[2]] <-  c(1, 4, 5, 6, 7)
+#set_methods <- vector("list", 2)
+#set_methods[[1]] <-  c(1, 2, 3)
+#set_methods[[2]] <-  c(1, 2, 3)
 
 comment <- ""
 savepdf(file.path(results.folder, paste("AGG-MSE-", comment, sep = "") ), height = 27 * 0.3)
@@ -114,12 +237,7 @@ for(iagg in seq(n_agg)){
 }
 dev.off()
 
-# BOT MSE
-mse_bot_byhour <- sapply(seq(n_bottom), function(ibot){
-  sapply(seq_along(bot_methods), function(imethod){
-    apply(matrix(mse_bottom[ibot, , imethod], ncol = 48, byrow = T), 2, mean)
-  })
-}, simplify = 'array')
+
 
 savepdf(file.path(results.folder, paste("BOT-MSE-", comment, sep = "") ))
 for(ibot in seq(n_bottom)){
@@ -129,25 +247,19 @@ for(ibot in seq(n_bottom)){
 }
 dev.off()
 
-avg_mse_agg <- apply(mse_agg_byhour, c(1, 2), mean)
-matplot(avg_mse_agg, type = 'l', col = color.agg, lty = 1)
+if(FALSE){
+  avg_mse_agg <- apply(mse_agg_byhour, c(1, 2), mean)
+  matplot(avg_mse_agg, type = 'l', col = color.agg, lty = 1)
+  avg_mse_bot <- apply(mse_bot_byhour, c(1, 2), mean)
+  matplot(avg_mse_bot, type = 'l', col = color.bot, lty = 1)
+  mybot_methods <- c("BASE", "BASE", "BASE", "BASE-MINT", "BASE-MEANCOMB")
+  myavg_agg <- avg_mse_agg
+  myagg_methods <- agg_methods
+  myavg_bot <- avg_mse_bot[, match(mybot_methods, bot_methods)]
+  matplot( (myavg_bot + myavg_agg)/2, type = 'l', col = color.agg, lty = 1)
+}
 
-avg_mse_bot <- apply(mse_bot_byhour, c(1, 2), mean)
-matplot(avg_mse_bot, type = 'l', col = color.bot, lty = 1)
 
-mybot_methods <- c("BASE", "BASE", "BASE", "BASE-MINT", "BASE-MEANCOMB")
-myavg_agg <- avg_mse_agg
-myagg_methods <- agg_methods
-myavg_bot <- avg_mse_bot[, match(mybot_methods, bot_methods)]
-matplot( (myavg_bot + myavg_agg)/2, type = 'l', col = color.agg, lty = 1)
-
-
-# AGG CRPS
-crps_agg_byhour <- sapply(seq(n_agg), function(iagg){
-  sapply(seq_along(agg_methods), function(imethod){
-    apply(matrix(crps_agg[iagg, , imethod], ncol = 48, byrow = T), 2, mean)
-  })
-}, simplify = 'array')
 
 savepdf(file.path(results.folder, paste("AGG-CRPS",sep = "") ), height = 27 * 0.3)
 par(mfrow = c(1, 2))
@@ -162,12 +274,7 @@ for(iagg in seq(n_agg)){
 }
 dev.off()
 
-# BOT CRPS
-crps_bot_byhour <- sapply(seq(n_bottom), function(ibot){
-  sapply(seq_along(bot_methods), function(imethod){
-    apply(matrix(crps_bottom[ibot, , imethod], ncol = 48, byrow = T), 2, mean)
-  })
-}, simplify = 'array')
+
 
 savepdf(file.path(results.folder, paste("BOT-CRPS-", comment, sep = "") ))
 for(ibot in seq(n_bottom)){
@@ -176,6 +283,11 @@ for(ibot in seq(n_bottom)){
   legend("topleft", bot_methods, col = color.bot, lty = 1)
 }
 dev.off()
+
+vv <- apply(crps_bot_byhour, c(2, 3), mean)
+uu <- t(t(vv) - vv[match("BASE", bot_methods), ])
+matplot(t(uu), type = 'l', lty = 1)
+boxplot(t(uu))
 
 # AVG AGG CRPS
 avg_agg <- apply(crps_agg_byhour, c(1, 2), mean)
@@ -227,8 +339,18 @@ for(i in seq(100)){
 }
 dev.off()
 
-# SKILL QUANTILE SCORE
 
+
+
+
+
+#savepdf(file.path(results.folder, paste("TESTING", sep = "") ))
+#for(i in seq(2, n_bottom)){
+#  print(i)
+#  avg_bot <- apply(crps_bot_byhour[, , seq(i)], c(1, 2), median)
+#  matplot(avg_bot, type = 'l', col = color.bot, lty = 1)
+#}
+#dev.off()
 
 
 ######

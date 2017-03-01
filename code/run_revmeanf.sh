@@ -11,15 +11,18 @@ rscript="revised_meanf.R"
   #nperjobs=28
 #njobs=55
 #nperjobs=1
+#njobs=36
+#nperjobs=2
 ####################
 
 doagg=FALSE
 tag="bottom"
   #njobs=16
   #nperjobs=99
-njobs=64
-nperjobs=25
-
+#njobs=64
+#nperjobs=25
+njobs=36
+nperjobs=44
 allijobs=$(seq 1 $njobs )
 
 for ijob in ${allijobs[@]}

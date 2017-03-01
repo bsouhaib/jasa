@@ -26,7 +26,7 @@ for(i in seq_along(allSeries)){
   MAT[i, ] <- as.numeric(model_final$beta)
   which(as.numeric(model_final$beta) !=0)
 }
-#stop("done")
+stop("done")
 
 #MAT <- matrix(NA, nrow = length(bottomSeries), ncol = length(allinputSeries) + nvar_additional)
 #for(i in seq_along(bottomSeries)){
@@ -44,9 +44,15 @@ savepdf(file.path(results.folder, paste("Pmatrix-MEANCOMB2") ), height = 27 * 0.
 image(as.matrix.csr(MAT), col=c("white","black"))
 dev.off()
 
+savepdf(file.path(results.folder, paste("HIST") ), height = 27 * 0.3)
 MATNOTZERO <- (MAT != 0)
 res <- apply(MATNOTZERO, 1, sum)
-hist(res)
+#hist(res, xlab = "Nb. of non-zero weights", freq = T)
+
+DAT <- data.frame(res)
+colnames(DAT)[1] <- "X"
+ggplot(data = DAT, aes(DAT$X)) + geom_histogram() + theme_bw() + xlab("Nb. of non-zero weights") 
+endpdf()
 
 res_sort <- sort(apply(MATNOTZERO, 2, sum), index = T, decreasing = T)
 

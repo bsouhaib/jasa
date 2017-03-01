@@ -7,7 +7,7 @@ permutations.R
 
 revised_meanf_init.R
 
-revised_meanf.R /revised_qf.R (BOTTOM ONLY)
+revised_meanf.R /revised_qf.R 
 
 byidtest.R
 

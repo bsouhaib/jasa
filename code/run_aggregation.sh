@@ -9,7 +9,8 @@ nperjobs=123
   #nperjobs=4416/$njobs
 
 #allijobs=$(seq 1 $njobs )
-allijobs=(5)
+
+allijobs=( 1 2 3 4 24 )
 
 for ijob in ${allijobs[@]}
 do

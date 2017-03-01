@@ -52,11 +52,12 @@ for(i_xvar in seq_along(allinputSeries)){
 }
 
 if(nvar_additional != 0){
-  Xhat_learn[, ncol(Xhat_learn)] <- as.factor(calendar$periodOfDay[learn$id])
-  X_test[, ncol(X_test)] <- as.factor(calendar$periodOfDay[test$id])
   
-  Xhat_learn[, ncol(Xhat_learn) - 1] <- as.factor(calendar$tyear[learn$id])
-  X_test[, ncol(X_test) - 1] <- as.factor(calendar$tyear[test$id])
+  Xhat_learn[, ncol(Xhat_learn) - 1] <- as.factor(calendar$periodOfDay[learn$id])
+  X_test[, ncol(X_test) - 1] <- as.factor(calendar$periodOfDay[test$id])
+  
+  Xhat_learn[, ncol(Xhat_learn)] <- as.factor(calendar$tyear[learn$id])
+  X_test[, ncol(X_test)] <- as.factor(calendar$tyear[test$id])
   
   #X_learn_fourier <- fourier.series(calendar$periodOfDay[learn$id], 2, 48)
   #X_test_fourier <- fourier.series(calendar$periodOfDay[test$id], 2, 48)
@@ -65,15 +66,11 @@ if(nvar_additional != 0){
   #X_test[, seq(nvar - nvar_additional + 1, nvar)] <- X_test_fourier
 }
 
-#my_penalty <- rep(1, ncol(Xhat_learn))
-#my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), rep(0, nvar_additional))
-my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), 0, 1) # time of year can be penalized
-
 # TRY TO KEEP THE ACTUAL MEAN UNPENALIZED
 # vec <- rep(1, ncol(Xhat_learn) - nvar_additional)
 # vec[match(idseries, allinputSeries)] <- 0
 # my_penalty <- c(vec, rep(0, nvar_additional))
 
 res_file <- file.path(work.folder, "revisedf", paste("revised_meanf_Xmatrix.Rdata", sep = "")) 
-save(file = res_file, list = c("Xhat_learn", "X_test", "my_penalty", "nvar_additional", "allinputSeries"))
+save(file = res_file, list = c("Xhat_learn", "X_test", "nvar_additional", "allinputSeries"))
 

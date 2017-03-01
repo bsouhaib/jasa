@@ -10,18 +10,17 @@ load(file.path(work.folder, "myinfo.Rdata"))
 plot.permsamples <- TRUE
 if(plot.permsamples){
   do.agg <- T
-  alliseries <- c(3)
+  alliseries <- c(1)
   idays <- seq(1, 7, by = 1)
-  algorithms <- c("NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MEANCOMB")
+  algorithms <- c("NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB")
   
   
   algo.agg <- "DYNREG"
   algo.bottom  <- "KD-IC-NML"
   
   #agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MEANCOMB")
-  agg_methods <- c("BASE", "NAIVEBU", "PERMBU")
-  algorithms <- c("BASE", "NAIVEBU", "PERMBU")
   
+  agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON")
   nbperjob <- 69
   
   QF_agg <- array(NA, c(M, length(algorithms), 69 * 5))

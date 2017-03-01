@@ -64,7 +64,7 @@ algo.bottom  <- "KD-IC-NML"
 algo.agg <- "DYNREG"
 
 bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
-agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
+agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON")
 
 #bot_methods <- c("BASE", "BASE-MINT")
 #agg_methods <- c("BASE", "NAIVEBU", "PERMBU")
@@ -301,6 +301,8 @@ for(idtest in allidtest){
       adj_bottom_mcombrecon <- as.numeric(-mean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
       adj_agg_mcombrecon    <- as.numeric(Sagg %*% adj_bottom_mcombrecon)
 
+      # unreconcilied
+      adj_agg_mcombunrecon <-  as.numeric(-mean_agg_idtest + revisedmean_agg_idtest)
    
      }else{
       # OLD MEANCOMB
@@ -375,6 +377,9 @@ for(idtest in allidtest){
     }else if(agg_method == "PERMBU-MCOMBRECON"){
       samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcombrecon)
       meanf_agg_method <- (Sagg %*% rev_and_reconcilied_bottom_mean_idtest)
+    }else if(agg_method == "PERMBU-MCOMBUNRECON"){
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcombunrecon)
+      meanf_agg_method <- revisedmean_agg_idtest
     }else{
       stop("error")
     }
