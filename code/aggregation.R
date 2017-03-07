@@ -2,7 +2,7 @@ rm(list = ls())
 args = (commandArgs(TRUE))
 if(length(args) == 0){
   idjob <- 1
-  allidtest <- 1:4 #1:1104
+  allidtest <- 1:123 #1:4 #1:1104 
 }else{
   
   #for(i in 1:length(args)){
@@ -387,6 +387,7 @@ for(idtest in allidtest){
     meanf_agg[, iagg_method] <- meanf_agg_method
   }
   
+
   if(idjob %in% c(1, 2, 3, 4, 5)){
     list_samples_agg[[idtest]] <- samples_agg
   }

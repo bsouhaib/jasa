@@ -1,8 +1,9 @@
 rm(list = ls())
+set.seed(1987)
 args = (commandArgs(TRUE))
 if(length(args) == 0){
-  do.agg <- F
-  alliseries <- c(1406)
+  do.agg <- T
+  alliseries <- c(44) #  c(1406) 
 }else{
   
   for(i in 1:length(args)){
@@ -32,6 +33,11 @@ load(file.path(work.folder, "myinfo.Rdata"))
 algo.agg <- "DYNREG"
 algo.bottom <- "KD-IC-NML"
 
+#library(doParallel)
+#registerDoParallel(4)
+
+myalpha <- 1
+nfolds <- 5
 do.shrink_towards_base <- TRUE
 include.calendar <- TRUE
 use.intercept <- TRUE
@@ -53,6 +59,7 @@ for(iseries in alliseries){
     #my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), 0, 1) # time of year can be penalized
     my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), 1, 1)
   }
+  my_penalty <- my_penalty[-1634]
   
   print(iseries)
   if(do.agg){
@@ -73,9 +80,13 @@ for(iseries in alliseries){
   
   if(!do.agg && do.shrink_towards_base){
     icol <- match(idseries, allinputSeries)
+  
     y_learn <- y_learn - Xhat_learn[, icol]
+    
     #y_test <-  y_test - X_test[, icol]
   }
+  
+  
   
   # remove na
   ikeep <- which(complete.cases(Xhat_learn))
@@ -91,11 +102,89 @@ for(iseries in alliseries){
   Xhat_train <- Xhat_learn[itrain, ]; y_train <- y_learn[itrain]
   Xhat_valid <- Xhat_learn[ivalid, ]; y_valid <- y_learn[ivalid]
   
-  myalpha <- .95
+  list_varlerrors <- vector("list", 48)
+  mu_revised_alltest_byh <- numeric(nrow(X_test))
+  for(h in seq(48)){
+    print(h)
+    
+    #h_set <- h
+    
+    #h_set <- c(h - 1, h)
+    h_set <- c(h - 1, h, h +1)
+    id_problem <- which(h_set > 48 || h_set < 1)
+    if(length(id_problem) > 0){
+      h_set <- h_set[-id_problem]
+    }
+    print(h_set)
+    
+    idh_train <- which(Xhat_train[, 1634] %in% h_set)
+    y_train_h <- y_train[idh_train]
+    Xhat_train_h <- Xhat_train[idh_train, -1634]
+    
+    idh_valid <- which(Xhat_valid[, 1634] %in% h_set)
+    Xhat_valid_h <- Xhat_valid[idh_valid, -1634]
+    y_valid_h <- y_valid[idh_valid]
+    
+    idh_learn <- which(Xhat_learn[, 1634] %in% h_set)
+    Xhat_learn_h <- Xhat_learn[idh_learn, -1634]
+    y_learn_h <- y_learn[idh_learn]
+    
+    idh_test <- which(X_test[, 1634] == h)
+    X_test_h <- X_test[idh_test, -1634]
+    y_test_h <- y_test[idh_test]
+    
+    # HOLDOUT
+    #model <- glmnet(y = y_train_h, x = Xhat_train_h, alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept)
+    #pred <- predict(model, Xhat_valid_h)
+    #val.err <- apply((pred - y_valid_h)^2, 2, mean)
+    #best_lambda <- model$lambda[which.min(val.err)]
+    
+    # CROSS-VALIDATION
+    n <- nrow(Xhat_learn_h)
+    foldid <- rep(seq(nfolds), each = ceiling(n/nfolds))
+    foldid <- head(foldid, n)
+    #res <- cv.glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, 
+    #                 penalty.factor = my_penalty, intercept = use.intercept, nfolds = nfolds, foldid = foldid,
+    #                 parallel=TRUE, dfmax = 5)
+    
+    if(do.agg){
+      model_seqlambda <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept)
+    }else{
+      model_seqlambda <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept, dfmax = 5)
+    }
+    res <- cv.glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, 
+                     intercept = use.intercept,  foldid = foldid, lambda = model_seqlambda$lambda)
+    
+    #res <- cv.glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, 
+    #                 penalty.factor = my_penalty, intercept = use.intercept, nfolds = nfolds,
+    #                 parallel=TRUE, dfmax = 5)
+    
+    best_lambda <-  res$lambda.1se
+    
+    model_final <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, 
+                          lambda = best_lambda, penalty.factor = my_penalty, intercept = use.intercept
+                          )
+    mu_revised_alltest_byh[idh_test] <- as.numeric(predict(model_final, X_test_h))
+    
+    beta <- as.numeric(model_final$beta)
+    id <- which(beta != 0)
+    print("---")
+    print(id)
+    print("---")
+    #print(beta[id])
+    
+    if(!do.agg && do.shrink_towards_base){
+      mu_revised_alltest_byh[idh_test] <- mu_revised_alltest_byh[idh_test] + X_test_h[, icol]
+    }
+    
+    #if(h == 2)
+    #  browser()
+    
+  }
   
-  model <- glmnet(y = y_train, x = Xhat_train, alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept)
-  pred <- predict(model, Xhat_valid)
-  val.err <- apply((pred - y_valid)^2, 2, mean)
+  model_total <- glmnet(y = y_train, x = Xhat_train[, -1634], alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept)
+  pred_total <- predict(model_total, Xhat_valid[, -1634])
+  val.err <- apply((pred_total - y_valid)^2, 2, mean)
   
   #plot.ts(y_valid)
   # lines(pred[, 100], col = "red")
@@ -105,14 +194,15 @@ for(iseries in alliseries){
   #plot.ts(val.err)
   #res <- cv.glmnet(y = y_learn, x = Xhat_learn, alpha = myalpha, nfolds = 3)
   
-  best_lambda <- model$lambda[which.min(val.err)]
-  model_final <- glmnet(y = y_learn, x = Xhat_learn, alpha = myalpha, lambda = best_lambda, penalty.factor = my_penalty, intercept = use.intercept)
+  best_lambda <- model_total$lambda[which.min(val.err)]
+  model_final <- glmnet(y = y_learn, x = Xhat_learn[, -1634], alpha = myalpha, 
+                        lambda = best_lambda, penalty.factor = my_penalty, intercept = use.intercept)
   
   #if(iseries == 12)
   #print(model_final)
   
   # testing
-  mu_revised_alltest <- as.numeric(predict(model_final, X_test))
+  mu_revised_alltest <- as.numeric(predict(model_final, X_test[, -1634]))
   
   if(!do.agg && do.shrink_towards_base){
     mu_revised_alltest <- mu_revised_alltest + X_test[, icol]

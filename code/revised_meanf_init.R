@@ -16,9 +16,12 @@ algo.bottom <- "KD-IC-NML"
 allinputSeries <- c(aggSeries, bottomSeries)
 n_inputs <- length(allinputSeries)
 
-nvar_additional <- 2
+nvar_additional <- 4
 Xhat_learn <- matrix(NA, nrow = length(learn$id), ncol = n_inputs + nvar_additional)
 X_test <- matrix(NA, nrow = length(test$id), ncol = n_inputs + nvar_additional)
+
+colnames(Xhat_learn)  <- c(allinputSeries, seq(nvar_additional))
+colnames(X_test)      <- c(allinputSeries, seq(nvar_additional))
 
 for(i_xvar in seq_along(allinputSeries)){
   
@@ -53,24 +56,42 @@ for(i_xvar in seq_along(allinputSeries)){
 
 if(nvar_additional != 0){
   
-  Xhat_learn[, ncol(Xhat_learn) - 1] <- as.factor(calendar$periodOfDay[learn$id])
-  X_test[, ncol(X_test) - 1] <- as.factor(calendar$periodOfDay[test$id])
+  Xhat_learn[, n_inputs + 1] <- calendar$periodOfDay[learn$id]
+  X_test[, n_inputs + 1]     <- calendar$periodOfDay[test$id]
+  colnames(Xhat_learn)[n_inputs + 1] <- "PDAY"
+  colnames(X_test)[n_inputs + 1]     <- "PDAY"
+      
+  Xhat_learn[, n_inputs + 2] <- calendar$tyear[learn$id]
+  X_test[, n_inputs + 2]     <- calendar$tyear[test$id]
+  colnames(Xhat_learn)[n_inputs + 2] <- "TYEAR"
+  colnames(X_test)[n_inputs + 2]     <- "TYEAR"
   
-  Xhat_learn[, ncol(Xhat_learn)] <- as.factor(calendar$tyear[learn$id])
-  X_test[, ncol(X_test)] <- as.factor(calendar$tyear[test$id])
+  Fmat_learn <- fourier.series(calendar$tyear[learn$id], 1, 365.25)
+  Fmat_test  <- fourier.series(calendar$tyear[test$id] , 1, 365.25)
   
-  #X_learn_fourier <- fourier.series(calendar$periodOfDay[learn$id], 2, 48)
-  #X_test_fourier <- fourier.series(calendar$periodOfDay[test$id], 2, 48)
-  #nvar <- ncol(Xhat_learn)
-  #Xhat_learn[, seq(nvar - nvar_additional + 1, nvar)] <- X_learn_fourier
-  #X_test[, seq(nvar - nvar_additional + 1, nvar)] <- X_test_fourier
+  Xhat_learn[, n_inputs + 3] <- Fmat_learn[, 1]
+  X_test[, n_inputs + 3] <- Fmat_test[, 1]
+  colnames(Xhat_learn)[n_inputs + 3] <- "C1"
+  colnames(X_test)[n_inputs + 3]     <- "C1"
+
+  
+  Xhat_learn[, n_inputs + 4] <- Fmat_learn[, 2]
+  X_test[, n_inputs + 4] <- Fmat_test[, 2]
+  colnames(Xhat_learn)[n_inputs + 4] <- "S1"
+  colnames(X_test)[n_inputs + 4]     <- "S1"
 }
 
-# TRY TO KEEP THE ACTUAL MEAN UNPENALIZED
-# vec <- rep(1, ncol(Xhat_learn) - nvar_additional)
-# vec[match(idseries, allinputSeries)] <- 0
-# my_penalty <- c(vec, rep(0, nvar_additional))
-
 res_file <- file.path(work.folder, "revisedf", paste("revised_meanf_Xmatrix.Rdata", sep = "")) 
-save(file = res_file, list = c("Xhat_learn", "X_test", "nvar_additional", "allinputSeries"))
+save(file = res_file, list = c("Xhat_learn", "X_test"))
 
+
+
+#Xhat_learn[, ncol(Xhat_learn) - 1] <- as.factor(calendar$periodOfDay[learn$id])
+#X_test[, ncol(X_test) - 1] <- as.factor(calendar$periodOfDay[test$id])
+#Xhat_learn[, ncol(Xhat_learn)] <- as.factor(calendar$tyear[learn$id])
+#X_test[, ncol(X_test)] <- as.factor(calendar$tyear[test$id])
+#X_learn_fourier <- fourier.series(calendar$periodOfDay[learn$id], 2, 48)
+#X_test_fourier <- fourier.series(calendar$periodOfDay[test$id], 2, 48)
+#nvar <- ncol(Xhat_learn)
+#Xhat_learn[, seq(nvar - nvar_additional + 1, nvar)] <- X_learn_fourier
+#X_test[, seq(nvar - nvar_additional + 1, nvar)] <- X_test_fourier

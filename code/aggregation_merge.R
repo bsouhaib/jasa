@@ -127,7 +127,6 @@ crps_agg_byhour <- sapply(seq(n_agg), function(iagg){
 
 ##################
 # FIGURE ICML
-
 mymethods_agg <- c("BASE", "NAIVEBU",  "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
 #mymethods <- c("BASE", "NAIVEBU",  "PERMBU", "PERMBU-MINT", "PERMBU-MCOMBRECON")
 
@@ -161,6 +160,14 @@ skillqs_agg <- sapply(myidsagg, function(iaggmethod){
 skillcrps_bot <- sapply(myidsbot, function(ibotgmethod){
   (avg_bot[, match("BASE", bot_methods)] - avg_bot[, ibotgmethod])/avg_bot[, match("BASE", bot_methods)]
 })
+
+#savepdf(file.path(results.folder, paste("MSEBOT", sep = "") ), width = 21 * 0.6 , height = 29.7 * 0.4)
+avg_mse_bot <- apply(mse_bot_byhour, c(1, 2), mean)
+skillmse_bot <- sapply(myidsbot, function(ibotgmethod){
+  (avg_mse_bot[, match("BASE", bot_methods)] - avg_mse_bot[, ibotgmethod])/avg_mse_bot[, match("BASE", bot_methods)]
+})
+matplot(skillmse_bot,  type = 'l', col = color.bot, lty = 1)
+
 
 if(do.skill){
   
@@ -239,7 +246,7 @@ dev.off()
 
 
 
-savepdf(file.path(results.folder, paste("BOT-MSE-", comment, sep = "") ))
+savepdf(file.path(results.folder, paste("BOT-MSE", sep = "") ))
 for(ibot in seq(n_bottom)){
   print(ibot)
   matplot(mse_bot_byhour[, , ibot], type = 'l', col = color.bot, lty = 1)
@@ -276,7 +283,7 @@ dev.off()
 
 
 
-savepdf(file.path(results.folder, paste("BOT-CRPS-", comment, sep = "") ))
+savepdf(file.path(results.folder, paste("BOT-CRPS", sep = "") ))
 for(ibot in seq(n_bottom)){
   print(ibot)
   matplot(crps_bot_byhour[, , ibot], type = 'l', col = color.bot, lty = 1)
