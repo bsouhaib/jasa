@@ -11,9 +11,6 @@ library(igraph)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-algo.bottom  <- "KD-IC-NML"
-algo.agg <- "DYNREG"
-
 n_bottom <- length(bottomSeries)
 n_total <- n_agg + n_bottom
 
@@ -37,7 +34,7 @@ for(do.agg in c(TRUE, FALSE)){
       resid_MINT_file <- file.path(insample.folder, algo, paste("residuals_MINT_", idseries, "_", algo, ".Rdata", sep = "")) 
       load(resid_MINT_file) # residuals_MINT
       e_vec <- c(rep(NA, n_past_obs_kd), residuals_MINT)
-    }else if(algo == "DYNREG"){
+    }else if(algo == "DYNREG" || algo == "DETS"){
       resid_MINT_file <- file.path(insample.folder, algo, paste("residuals_MINT_", idseries, "_", algo, "_", 1, ".Rdata", sep = "")) 
       load(resid_MINT_file)
       e_vec <- residuals_MINT

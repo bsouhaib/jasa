@@ -3,7 +3,7 @@ set.seed(1987)
 args = (commandArgs(TRUE))
 if(length(args) == 0){
   do.agg <- T
-  alliseries <- c(44) #  c(1406) 
+  alliseries <- c(1) #  c(1406) 
 }else{
   
   for(i in 1:length(args)){
@@ -25,8 +25,8 @@ library(igraph)
 library(Matrix)
 library(glmnet)
 
-library(quantreg)
-library(rqPen)
+#library(quantreg)
+#library(rqPen)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
@@ -44,22 +44,11 @@ use.intercept <- TRUE
 
 for(iseries in alliseries){
   
-   # HERE !!!!!!
+  # HERE !!!!!!
   load(file.path(work.folder, "revisedf", paste("revised_meanf_Xmatrix.Rdata", sep = "")))
   
-  
-  if(!include.calendar){
-    Xhat_learn <- Xhat_learn[, -(ncol(Xhat_learn) - 0:1) ]
-    X_test <- X_test[, -(ncol(Xhat_learn) - 0:1) ]
-    my_penalty <- rep(1, ncol(Xhat_learn))
-  }else{
-    #my_penalty <- rep(1, ncol(Xhat_learn))
-    #my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), rep(0, nvar_additional))
-    
-    #my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), 0, 1) # time of year can be penalized
-    my_penalty <- c(rep(1, ncol(Xhat_learn) - nvar_additional), 1, 1)
-  }
-  my_penalty <- my_penalty[-1634]
+  allvar <- colnames(Xhat_learn)
+  stopifnot(all(allvar == colnames(Xhat_test)))
   
   print(iseries)
   if(do.agg){
@@ -70,40 +59,31 @@ for(iseries in alliseries){
     load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
   }
   
-  # icol <- match(idseries, allinputSeries)
-  # 
-
+  
   demand_idseries <- demand
   
   y_learn <- demand_idseries[learn$id]
   y_test <- demand_idseries[test$id]
   
   if(!do.agg && do.shrink_towards_base){
-    icol <- match(idseries, allinputSeries)
-  
-    y_learn <- y_learn - Xhat_learn[, icol]
-    
-    #y_test <-  y_test - X_test[, icol]
+    col_iseries <- match(idseries, allvar)
+    y_learn <- y_learn - Xhat_learn[, col_iseries]
   }
-  
-  
   
   # remove na
   ikeep <- which(complete.cases(Xhat_learn))
   Xhat_learn <- Xhat_learn[ikeep, ]
   y_learn <- y_learn[ikeep]
-  
+  pday_learn <- pday_learn[ikeep]
+
   nlearn <- nrow(Xhat_learn)
   itrain <- seq(round(0.75*nlearn)) 
-  #set.seed(1986); 
-  #itrain <- sample(nlearn, round(0.75*nlearn))
   ivalid <- setdiff(seq(nlearn), itrain)
-  
   Xhat_train <- Xhat_learn[itrain, ]; y_train <- y_learn[itrain]
   Xhat_valid <- Xhat_learn[ivalid, ]; y_valid <- y_learn[ivalid]
   
-  list_varlerrors <- vector("list", 48)
-  mu_revised_alltest_byh <- numeric(nrow(X_test))
+  n_test <- nrow(Xhat_test)
+  mu_revised_alltest_byh <- numeric(n_test)
   for(h in seq(48)){
     print(h)
     
@@ -117,20 +97,19 @@ for(iseries in alliseries){
     }
     print(h_set)
     
-    idh_train <- which(Xhat_train[, 1634] %in% h_set)
-    y_train_h <- y_train[idh_train]
-    Xhat_train_h <- Xhat_train[idh_train, -1634]
+    #idh_train <- which(Xhat_train[, 1634] %in% h_set)
+    #y_train_h <- y_train[idh_train]
+    #Xhat_train_h <- Xhat_train[idh_train, -1634]
+    #idh_valid <- which(Xhat_valid[, 1634] %in% h_set)
+    #Xhat_valid_h <- Xhat_valid[idh_valid, -1634]
+    #y_valid_h <- y_valid[idh_valid]
     
-    idh_valid <- which(Xhat_valid[, 1634] %in% h_set)
-    Xhat_valid_h <- Xhat_valid[idh_valid, -1634]
-    y_valid_h <- y_valid[idh_valid]
-    
-    idh_learn <- which(Xhat_learn[, 1634] %in% h_set)
-    Xhat_learn_h <- Xhat_learn[idh_learn, -1634]
+    idh_learn <- which(pday_learn %in% h_set)
+    Xhat_learn_h <- Xhat_learn[idh_learn, ]
     y_learn_h <- y_learn[idh_learn]
     
-    idh_test <- which(X_test[, 1634] == h)
-    X_test_h <- X_test[idh_test, -1634]
+    idh_test <- which(pday_test == h)
+    Xhat_test_h <- Xhat_test[idh_test, ]
     y_test_h <- y_test[idh_test]
     
     # HOLDOUT
@@ -148,9 +127,9 @@ for(iseries in alliseries){
     #                 parallel=TRUE, dfmax = 5)
     
     if(do.agg){
-      model_seqlambda <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept)
+      model_seqlambda <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, intercept = use.intercept)
     }else{
-      model_seqlambda <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept, dfmax = 5)
+      model_seqlambda <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, intercept = use.intercept, dfmax = 5)
     }
     res <- cv.glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, 
                      intercept = use.intercept,  foldid = foldid, lambda = model_seqlambda$lambda)
@@ -162,64 +141,66 @@ for(iseries in alliseries){
     best_lambda <-  res$lambda.1se
     
     model_final <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, 
-                          lambda = best_lambda, penalty.factor = my_penalty, intercept = use.intercept
-                          )
-    mu_revised_alltest_byh[idh_test] <- as.numeric(predict(model_final, X_test_h))
+                          lambda = best_lambda, intercept = use.intercept)
+    
+    mu_revised_alltest_byh[idh_test] <- as.numeric(predict(model_final, Xhat_test_h))
     
     beta <- as.numeric(model_final$beta)
     id <- which(beta != 0)
-    print("---")
-    print(id)
-    print("---")
-    #print(beta[id])
-    
+    print(paste(paste("Var : "), paste(id, collapse = " "), sep = ""))
+
     if(!do.agg && do.shrink_towards_base){
-      mu_revised_alltest_byh[idh_test] <- mu_revised_alltest_byh[idh_test] + X_test_h[, icol]
+      mu_revised_alltest_byh[idh_test] <- mu_revised_alltest_byh[idh_test] + Xhat_test_h[, col_iseries]
     }
     
-    #if(h == 2)
-    #  browser()
-    
   }
   
-  model_total <- glmnet(y = y_train, x = Xhat_train[, -1634], alpha = myalpha, penalty.factor = my_penalty, intercept = use.intercept)
-  pred_total <- predict(model_total, Xhat_valid[, -1634])
+  
+  model_total <- glmnet(y = y_train, x = Xhat_train, alpha = myalpha, intercept = use.intercept)
+  pred_total <- predict(model_total, Xhat_valid)
   val.err <- apply((pred_total - y_valid)^2, 2, mean)
-  
-  #plot.ts(y_valid)
-  # lines(pred[, 100], col = "red")
-  # lines(pred[, 1], col = "red")
-  
-  #stop("done")
-  #plot.ts(val.err)
-  #res <- cv.glmnet(y = y_learn, x = Xhat_learn, alpha = myalpha, nfolds = 3)
-  
   best_lambda <- model_total$lambda[which.min(val.err)]
-  model_final <- glmnet(y = y_learn, x = Xhat_learn[, -1634], alpha = myalpha, 
-                        lambda = best_lambda, penalty.factor = my_penalty, intercept = use.intercept)
-  
-  #if(iseries == 12)
-  #print(model_final)
+  model_final <- glmnet(y = y_learn, x = Xhat_learn, alpha = myalpha, 
+                        lambda = best_lambda, intercept = use.intercept)
   
   # testing
-  mu_revised_alltest <- as.numeric(predict(model_final, X_test[, -1634]))
+  mu_revised_alltest <- as.numeric(predict(model_final, Xhat_test))
   
   if(!do.agg && do.shrink_towards_base){
-    mu_revised_alltest <- mu_revised_alltest + X_test[, icol]
+    mu_revised_alltest <- mu_revised_alltest + Xhat_test[, col_iseries]
   }
-  
   stop("done")
   
-  res_file <- file.path(work.folder, "revisedf", paste("revised_meanf_", idseries, ".Rdata", sep = "")) 
-  save(file = res_file, list = c("mu_revised_alltest", "model_final"))
-
+  #res_file <- file.path(work.folder, "revisedf", paste("revised_meanf_", idseries, ".Rdata", sep = "")) 
+  #save(file = res_file, list = c("mu_revised_alltest"))
+  
+  ### OLD CODE
+  if(FALSE){
+    model_total <- glmnet(y = y_train, x = Xhat_train, alpha = myalpha, intercept = use.intercept)
+    pred_total <- predict(model_total, Xhat_valid)
+    val.err <- apply((pred_total - y_valid)^2, 2, mean)
+    best_lambda <- model_total$lambda[which.min(val.err)]
+    model_final <- glmnet(y = y_learn, x = Xhat_learn, alpha = myalpha, 
+                          lambda = best_lambda, intercept = use.intercept)
+    
+    # testing
+    mu_revised_alltest <- as.numeric(predict(model_final, Xhat_test))
+    
+    if(!do.agg && do.shrink_towards_base){
+      mu_revised_alltest <- mu_revised_alltest + Xhat_test[, col_iseries]
+    }
+    
+    res_file <- file.path(work.folder, "revisedf", paste("revised_meanf_", idseries, ".Rdata", sep = "")) 
+    save(file = res_file, list = c("mu_revised_alltest", "model_final"))
+  }
+  ###
 }
 
 ################
 if(FALSE){
   
   plot.ts(head(y_test, 48*7*2))
-  lines(X_test[, match(idseries, allinputSeries)], col = "red")
+  lines(Xhat_test[, match(idseries, allinputSeries)], col = "red")
   
   err_new <- err_old <- NULL
   savepdf(file.path(results.folder, paste("PREDTEST_", nvar_additional, sep = "") ))
@@ -227,8 +208,8 @@ if(FALSE){
     index <- (ijob - 1) * 48 +  seq(48)
     new_pred <- mu_revised_alltest[index]
     actual <- demand_idseries[test$id[index]]
-    old_pred <- X_test[index, match(idseries, allinputSeries)]
-  
+    old_pred <- Xhat_test[index, match(idseries, allinputSeries)]
+    
     err_new <- c(err_new, (new_pred - actual)^2)
     err_old <- c(err_old, (old_pred - actual)^2)
     
@@ -253,7 +234,7 @@ if(FALSE){
   
   for(idtest in seq(length(test$id))){
     if(idtest%%100 == 0)
-    print(idtest)
+      print(idtest)
     
     res_byidtest_file <- file.path(work.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
     load(res_byidtest_file)

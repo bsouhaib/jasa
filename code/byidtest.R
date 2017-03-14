@@ -9,9 +9,6 @@ source("utils.R")
 library(ff)
 load(file.path(work.folder, "myinfo.Rdata"))
 
-
-algo.agg <- "DYNREG"
-algo.bottom <- "KD-IC-NML"
 ntest <- length(test$id)
 
 QF_bottom <- vector("list", length(bottomSeries))

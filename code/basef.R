@@ -4,9 +4,10 @@ args = (commandArgs(TRUE))
 if(length(args) == 0){
   #hierarchy <- "geo"
   #ncores <- 2
-  algo <- c("KD-IC-NML")
+  #algo <- c("KD-IC-NML")
   #algo <- c("TBATS")
   #algo <- "DYNREG"
+  algo <- "DETS"
     
   do.agg <- F
   alliseries <- c(354)
@@ -41,7 +42,7 @@ library(glmnet)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-algos_allowed <- c("Uncond", "KD-IC-NML", "DYNREG")
+algos_allowed <- c("Uncond", "KD-IC-NML", "DYNREG", "DETS")
 stopifnot(algo %in% algos_allowed)
 
 for(iseries in alliseries){
@@ -68,7 +69,127 @@ for(iseries in alliseries){
   res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
   dir.create(file.path(basef.folder, algo), showWarnings = FALSE)
  
-  if(algo == "DYNREG"){
+  if(algo == "DETS"){
+    
+    do.logtrans <- FALSE
+    if(do.logtrans){
+      my_ts <- log(demand)	     
+    }else{
+      my_ts <- demand
+    }
+    
+    ids_future <- test$id
+    nb_futuredays <- length(seq_testing_interval)/48
+    
+    all_qf <- all_mf <- all_sd <- all_mfsample <- vector("list", nb_futuredays)
+    mydays <- seq(1, nb_futuredays)
+    
+    for(id_future_day in mydays){
+      print(id_future_day)
+      print(base::date())
+      
+      if(id_future_day == 1){
+        ids_past   <-  learn$id
+        n_past_obs <- length(ids_past)
+      }else{
+        n_past_obs <- n_past_obs_tbats
+        ids_past   <- tail(learn$id, n_past_obs)
+      }
+      
+      offset_nhours <- (id_future_day - 1) * 48
+      ids_future_hours <- ids_future[offset_nhours + seq(1, 48)] 
+      
+      if(offset_nhours > 0){
+        ids_past_actual <- c(ids_past, ids_future)[offset_nhours + seq(n_past_obs)]
+      }else{
+        ids_past_actual <- ids_past
+      }
+      
+      ypast <- as.numeric(my_ts[ids_past_actual])
+      
+      do.optimize <- (id_future_day - 1) %% 7 == 0
+      
+      
+        # initialization
+        a <- 1/336 * (mean(ypast[seq(336)]) - mean(ypast[336 + seq(336)]))
+        b <- mean(diff(ypast[seq(336)]))
+        T_0 <- (a+b)/2
+        l_start <- mean(ypast[seq(2 * 336)]) - 336.5 * T_0
+        
+        # days
+        nb_obs <- 7 * m_1
+        indices <- seq(nb_obs)
+        smoothed_line <- ma(ypast[indices], m_1)
+        #indices <- seq(m_1/2 + 1, nb_obs - m_1/2)
+        x <- ypast[indices] - smoothed_line[indices]
+        mat <- matrix(x, ncol = 48, byrow = T)
+        D <- apply(mat, 2, mean, na.rm = T)
+        D <- D - mean(D)
+        
+        # weeks
+        nb_weeks <- 4
+        indices <- seq(nb_weeks * m_2)
+        smoothed_line <- ma(ypast[indices], m_2)
+        x <- ypast[indices] - smoothed_line[indices] - rep(D, nb_weeks * 7)
+        mat <- matrix(x, ncol = 336, byrow = T)
+        W <- apply(mat, 2, mean, na.rm = T)
+        W <- W - mean(W)
+        
+        e_0 <- rep(0, m_2)
+        l_0 <- rep(l_start, m_2)
+        d_0 <- rep(D, 7)
+        w_0 <- W
+        
+      ###  
+      if(do.optimize){  
+        N <- 100
+        THETA <-  matrix(runif(N * 4), ncol = 4)
+        E <- sapply(seq(nrow(THETA)), function(i){ 
+          #print(i)
+          func_to_optimize(THETA[i, ], y = ypast, e_0 = e_0, l_0 = l_0, d_0 = d_0, w_0 = w_0, do.forecast = FALSE)
+        })
+        id <- sort(E, index = T)$ix[1]
+        res_optim <- optim(THETA[id, ], fn = func_to_optimize, y = ypast, e_0 = e_0, l_0 = l_0, d_0 = d_0, w_0 = w_0, do.forecast = F,
+                           method = "L-BFGS-B", lower = 0, upper = 1)
+      }
+        
+      #if(id_future_day == 23)
+      #  stop("done")
+        
+      obj_forecast <- iterate(res_optim$par, ypast, e_0, l_0, d_0, w_0, do.forecast = T)
+      
+      #matplot(t(obj_forecast$qf), type = 'l', lty = 1)
+      #points(demand[test$id[seq(48)]], lwd = 2)  
+      
+      
+      if(id_future_day == 1){
+        dir.create(file.path(insample.folder, algo), recursive = TRUE, showWarnings = FALSE)
+        # insample mean
+        all_mu <- obj_forecast$yhat
+        insample_condmean_file <- file.path(insample.folder, algo, paste("condmean_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+        save(file = insample_condmean_file, list = c("all_mu"))
+        
+        # residuals COPULA
+        e_residuals <- obj_forecast$residuals
+        resid_file <- file.path(insample.folder, algo, paste("residuals_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+        save(file = resid_file, list = c("e_residuals"))
+        
+        # residuals MINT
+        residuals_MINT <- obj_forecast$residuals
+        resid_MINT_file <- file.path(insample.folder, algo, paste("residuals_MINT_", idseries, "_", algo, "_", id_future_day, ".Rdata", sep = "")) 
+        save(file = resid_MINT_file, list = c("residuals_MINT"))
+      }
+
+      all_mf[[id_future_day]] <- obj_forecast$mf
+      all_qf[[id_future_day]] <- obj_forecast$qf
+      
+      all_mfsample[[id_future_day]] <- obj_forecast$mfsample
+      
+    }
+    list_save <- c("all_qf", "all_mf", "all_mfsample")
+    save(file = res_file, list = list_save)
+    
+  }else if(algo == "DYNREG"){
     
     do.logtrans <- TRUE
     do.condvar <- FALSE

@@ -8,9 +8,6 @@ library(parallel)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-algo.bottom <- "KD-IC-NML"
-algo.agg <- "DYNREG"
-
 # compute the parsing order of the aggregate nodes
 leaves <- V(itree)[degree(itree, mode="out") == 0]
 agg_nodes <- V(itree)[degree(itree, mode="out") != 0]
@@ -56,6 +53,6 @@ for(inode in seq_along(agg_nodes)){
     colnames(mat_permutations) <- names(children_nodes)
 
     
-    perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, ".Rdata", sep = "")) 
+    perm_file <- file.path(permutations.folder, paste("perm_", algo.agg, "_", algo.bottom, "_", idseries_agg, ".Rdata", sep = "")) 
     save(file = perm_file, list = c("mat_permutations", "vec_ties"))
 }

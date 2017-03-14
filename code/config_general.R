@@ -27,4 +27,14 @@ M <- 120 * 48 # 5760
   
 q_probs <- seq(M)/(M + 1)
 
+m_1 <- 48
+m_2 <- 336
+
+#algo.agg <- "DYNREG"
+algo.agg <- "DETS"
+algo.bottom <- "KD-IC-NML"
+
+print(algo.agg)
+print(algo.bottom)
+
 

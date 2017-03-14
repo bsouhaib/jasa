@@ -50,8 +50,9 @@ compute_qscores <- function(methods, n, mat_samples, observations){
   qscores
 }
 
-if(idjob == 36){
-  allidtest <- 4306:4416
+if(idjob == 34){
+  # allidtest <- 4306:4416
+  allidtest <- 4291:4416
 }
 
 print(allidtest)
@@ -59,9 +60,6 @@ print(allidtest)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 n_bottom <- length(bottomSeries)
-
-algo.bottom  <- "KD-IC-NML"
-algo.agg <- "DYNREG"
 
 bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
 agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON")
@@ -151,19 +149,21 @@ for(idtest in allidtest){
       #res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
       #load(res_file)
       
-      if(algo == "Uncond" || algo == "PeriodOfDay"){
+      #if(algo == "Uncond" || algo == "PeriodOfDay"){
         #
-      }else if(algo == "DYNREG"){	
-        invcdf <- approxfun(taus, QF_agg_idtest[, j], rule = 2)
-      }else if(algo == "KD-IC-NML"){	
-        invcdf <- approxfun(taus, QF_bottom_idtest[, j], rule = 2)
-      }else{
-        stop("error")
-      }
+      #}else if(algo == "DYNREG"){	
+      #  invcdf <- approxfun(taus, QF_agg_idtest[, j], rule = 2)
+      #}else if(algo == "KD-IC-NML"){	
+      #  invcdf <- approxfun(taus, QF_bottom_idtest[, j], rule = 2)
+      #}else{
+      #  stop("error")
+      #}
       
       if(do.agg){
+        invcdf <- approxfun(taus, QF_agg_idtest[, j], rule = 2)
         base_samples_agg[, j]    <- invcdf(q_probs)
       }else{
+        invcdf <- approxfun(taus, QF_bottom_idtest[, j], rule = 2)
         base_samples_bottom[, j] <- invcdf(q_probs)
       }
       #Q[, j] <- invcdf(q_probs)
@@ -188,7 +188,8 @@ for(idtest in allidtest){
     
     
     # load permutation file
-    perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, ".Rdata", sep = "")) 
+    #perm_file <- file.path(permutations.folder, paste("perm_", idseries_agg, ".Rdata", sep = "")) 
+    perm_file <- file.path(permutations.folder, paste("perm_", algo.agg, "_", algo.bottom, "_", idseries_agg, ".Rdata", sep = ""))
     load(perm_file) # c("list_permutations", "list_ties")
     
     

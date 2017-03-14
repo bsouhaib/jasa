@@ -8,9 +8,6 @@ library(igraph)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-algo.agg <- "DYNREG"
-algo.bottom  <- "KD-IC-NML"
-
 ntest <- length(test$id)
 n_bottom <- length(bottomSeries)
 
@@ -18,9 +15,11 @@ n_bottom <- length(bottomSeries)
 #nbperjob <- 69
 #njobs <- ntest/nbperjob
 
-nbperjob <- 123
-njobs <- 36
+#nbperjob <- 123
+#njobs <- 36
 
+nbperjob <- 130
+njobs <- 34
 
 #agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "NAIVEBU-MINT", "PERMBU-MINT")
 #color.agg <- c("black", "orange", "darkblue")
@@ -64,8 +63,8 @@ for(idjob in seq(njobs)){
   print(idjob)
   allidtest <- (idjob - 1) * nbperjob + seq(nbperjob) 
   
-  if(nbperjob == 123 && idjob == 36){
-    allidtest <- 4306:4416
+  if(nbperjob == 130 && idjob == 34){
+    allidtest <- 4291:4416
   }
   
   res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
@@ -93,7 +92,7 @@ for(idjob in seq(njobs)){
 total_qscores_agg <- total_qscores_agg / njobs
 #total_qscores_bot <- total_qscores_bot / njobs
 
-stop("done")
+
 # crps_agg   total_qscores_agg
 # crps_bottom total_qscores_bot
 
@@ -125,6 +124,7 @@ crps_agg_byhour <- sapply(seq(n_agg), function(iagg){
   })
 }, simplify = 'array')
 
+stop("done")
 ##################
 # FIGURE ICML
 mymethods_agg <- c("BASE", "NAIVEBU",  "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")

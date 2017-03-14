@@ -7,7 +7,7 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
-plot.permsamples <- TRUE
+plot.permsamples <- FALSE
 if(plot.permsamples){
   do.agg <- T
   alliseries <- c(1)
@@ -48,10 +48,11 @@ if(plot.permsamples){
   })
   
 }else{
-  do.agg <- F
-  alliseries <- c(130)
+  do.agg <- T
+  alliseries <- c(10)
   #algorithms <- c("DYNREG")
-  algorithms <- c("KD-IC-NML")
+  #algorithms <- c("KD-IC-NML")
+  algorithms <- c("DETS", "DYNREG")
   
   idays <- seq(1, 92, by = 1)
 }
@@ -120,8 +121,9 @@ for(iseries in alliseries){
   
       if(algo_load == "KD-IC-NML"){
         list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf) #res_testing
-      }else if(algo_load == "TBATS" || algo_load == "DYNREG"){
+      }else if(algo_load == "TBATS" || algo_load == "DYNREG" || algo_load == "DETS"){
         list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf)
+        #list_load[[ialgo]] <- list(all_qf = all_qf, all_mf = all_mf, all_mfsample = all_mfsample)
       }else if(algo_load == "Uncond"){
         list_load[[ialgo]] <- list(qFtest = qFtest, mFtest = mFtest)
       }
@@ -144,7 +146,7 @@ for(iseries in alliseries){
       algo <- algorithms[ialgo]
       algo_load <- algo
       
-      if(algo_load == "KD-IC-NML" || algo_load == "TBATS" || algo_load == "DYNREG" || plot.permsamples){
+      if(algo_load == "KD-IC-NML" || algo_load == "TBATS" || algo_load == "DYNREG" || algo_load == "DETS" || plot.permsamples){
         
         all_qf <- list_load[[ialgo]]$all_qf
         all_mf <- list_load[[ialgo]]$all_mf
@@ -154,6 +156,11 @@ for(iseries in alliseries){
         #  qf <- all_qf[[iday]][, hour]
         #})
         qf_allhours <- all_qf[[iday]]
+        
+        #if(algo == "DETS")
+        #browser()
+        # all_mfsample <- list_load[[ialgo]]$all_mfsample
+        # mu_hatsample <- matrix(unlist(all_mfsample), ncol = 48, byrow = T)
 
       }else if(algo_load == "Uncond"){
         qFtest <- list_load[[ialgo]]$qFtest
