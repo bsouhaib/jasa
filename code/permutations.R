@@ -4,13 +4,16 @@ source("config_general.R")
 source("config_splitting.R")
 source("jasa_utils.R")
 source("utils.R")
-library(parallel)
+#library(parallel)
+library(igraph)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
 # compute the parsing order of the aggregate nodes
 leaves <- V(itree)[degree(itree, mode="out") == 0]
 agg_nodes <- V(itree)[degree(itree, mode="out") != 0]
+
+list_matpermutations <- list_vecties <- vector("list", length(agg_nodes))
 
 for(inode in seq_along(agg_nodes)){
   agg_node <- agg_nodes[inode]
@@ -52,7 +55,13 @@ for(inode in seq_along(agg_nodes)){
     mat_permutations <- apply(mat_residuals, 2, rank, ties.method = "random")
     colnames(mat_permutations) <- names(children_nodes)
 
-    
-    perm_file <- file.path(permutations.folder, paste("perm_", algo.agg, "_", algo.bottom, "_", idseries_agg, ".Rdata", sep = "")) 
-    save(file = perm_file, list = c("mat_permutations", "vec_ties"))
+    list_matpermutations[[inode]] <- mat_permutations
+    list_vecties[[inode]] <- vec_ties
+    #perm_file <- file.path(permutations.folder, paste("perm_", algo.agg, "_", algo.bottom, "_", idseries_agg, ".Rdata", sep = "")) 
+    #save(file = perm_file, list = c("mat_permutations", "vec_ties"))
 }
+
+list_matpermutations <- setNames(list_matpermutations, names(agg_nodes))
+list_vecties         <- setNames(list_vecties, names(agg_nodes))
+perm_file <- file.path(permutations.folder, paste("perm_", algo.agg, "_", algo.bottom, ".Rdata", sep = "")) 
+save(file = perm_file, list = c("list_matpermutations", "list_vecties"))

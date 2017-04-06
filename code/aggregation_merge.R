@@ -18,8 +18,19 @@ n_bottom <- length(bottomSeries)
 #nbperjob <- 123
 #njobs <- 36
 
-nbperjob <- 130
-njobs <- 34
+#nbperjob <- 130
+#njobs <- 34
+
+nbperjob <- 138
+njobs <- 32
+
+leaves <- V(itree)[degree(itree, mode="out") == 0]
+agg_nodes <- V(itree)[degree(itree, mode="out") != 0]
+
+depth_aggnodes <- sapply(agg_nodes, function(agg_node){
+  vec <- distances(itree, agg_node, leaves, mode = "out")
+  max( vec[which(vec!=Inf)])
+})
 
 #agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "NAIVEBU-MINT", "PERMBU-MINT")
 #color.agg <- c("black", "orange", "darkblue")
@@ -43,14 +54,15 @@ njobs <- 34
 
 bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
 color.bot <- c("black", "purple", "darkgreen", "darkblue")
-agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON")
-color.agg <- c("black", "orange", "cyan", "purple", "darkgreen", "darkblue", "red")
+agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
+                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON", "NAIVEBU-MINT")
+color.agg <- c("black", "orange", "cyan", "purple", "darkgreen", "darkblue", "red", "pink")
 
 agg_better_names <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2", "PERMBU-COMB")
 bot_better_names <- c("BASE", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2")
 
 
-
+wcrps_agg    <- array(NA, c(5, n_agg, ntest, length(agg_methods)))
 crps_agg    <- array(NA, c(n_agg, ntest, length(agg_methods)))
 crps_bottom <- array(NA, c(n_bottom, ntest, length(bot_methods)))
 
@@ -64,17 +76,25 @@ for(idjob in seq(njobs)){
   allidtest <- (idjob - 1) * nbperjob + seq(nbperjob) 
   
   if(nbperjob == 130 && idjob == 34){
+    # allidtest <- 4306:4416
     allidtest <- 4291:4416
   }
   
   res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
   load(res_job)
   
+  
+  list_wcrps_agg_nonull <- list_wcrps_agg[-which(sapply(list_wcrps_agg, is.null))]
+  mat_wcrps_agg <- sapply(seq_along(list_wcrps_agg_nonull),  function(i){list_wcrps_agg_nonull[[i]]}, simplify = 'array')
+ 
+  
+  
   list_crps_agg_nonull <- list_crps_agg[-which(sapply(list_crps_agg, is.null))]
   mat_crps_agg <- sapply(seq_along(list_crps_agg_nonull),  function(i){list_crps_agg_nonull[[i]]}, simplify = 'array')
   list_crps_bot_nonull <- list_crps_bot[-which(sapply(list_crps_bot, is.null))]
   mat_crps_bot <- sapply(seq_along(list_crps_bot_nonull),  function(i){list_crps_bot_nonull[[i]]}, simplify = 'array')
 
+  wcrps_agg[, , allidtest,]    <- aperm(mat_wcrps_agg, c(1, 2, 4, 3))
   crps_agg[, allidtest,]     <- aperm(mat_crps_agg, c(1, 3, 2))
   crps_bottom[, allidtest, ] <- aperm(mat_crps_bot, c(1, 3, 2))
   total_qscores_agg <- total_qscores_agg + avg_qscores_agg
@@ -123,6 +143,16 @@ crps_agg_byhour <- sapply(seq(n_agg), function(iagg){
     apply(matrix(crps_agg[iagg, , imethod], ncol = 48, byrow = T), 2, mean)
   })
 }, simplify = 'array')
+
+wcrps_agg_byhour <- sapply(seq(5), function(iweight){
+  sapply(seq(n_agg), function(iagg){
+    sapply(seq_along(agg_methods), function(imethod){
+      apply(matrix(wcrps_agg[iweight, iagg, , imethod], ncol = 48, byrow = T), 2, mean)
+    })
+  }, simplify = 'array')
+}, simplify = 'array')
+
+wcrps_agg_byhour <- aperm(wcrps_agg_byhour, c(4, 1, 2, 3))
 
 stop("done")
 ##################
@@ -231,7 +261,7 @@ set_methods[[2]] <-  c(1, 4, 5, 6, 7)
 #set_methods[[2]] <-  c(1, 2, 3)
 
 comment <- ""
-savepdf(file.path(results.folder, paste("AGG-MSE-", comment, sep = "") ), height = 27 * 0.3)
+savepdf(file.path(results.folder, paste("AGG-MSE", sep = "") ), height = 27 * 0.3)
 par(mfrow = c(1, 2))
 
 for(iagg in seq(n_agg)){
@@ -266,17 +296,179 @@ if(FALSE){
   matplot( (myavg_bot + myavg_agg)/2, type = 'l', col = color.agg, lty = 1)
 }
 
+#######
+#agg_imethods <- c(1:4, 6, 7, 8) 
+agg_imethods <- match(c("BASE", "NAIVEBU","PERMBU", "NAIVEBU-MINT", "PERMBU-MINT"), agg_methods)
+bot_imethods <- match(c("BASE", "BASE-MINT"), bot_methods) #c(1, 2)
+
+#####################
+savepdf(file.path(results.folder, paste("AGG-WCRPS-LEVEL",sep = "") ), height = 27 * 0.3)
+par(mfrow = c(3, 5))
+#par(mfrow = c(3, 5), 
+#    oma = c(5,4,0,0),
+#    mar = c(0,0,2,2))
+
+for(iweight in c(1, 3)){
+  if(iweight == 1){
+    my_ylab <- "wCRPS (uniform)"
+  }else if(iweight == 2){
+    my_ylab <- "wCRPS (center)"
+  }else if(iweight == 3){
+    my_ylab <- "wCRPS (both tails)"
+  }else if(iweight == 4){
+    my_ylab <- "wCRPS (right tail)"
+  }else if(iweight == 5){
+    my_ylab <- "wCRPS (left tail)"
+  }
+  for(level in seq(4, 1)){
+    id <- which(depth_aggnodes == level)
+    
+    mat <- apply(wcrps_agg_byhour[iweight, , agg_imethods, id, drop = F], c(2, 3), mean)
+    
+    my_main <- paste("level ", level, " - ", "(", length(id), ")", sep = "")
+    if(iweight != 1){
+      my_main <- ""
+    }
+    if(level != 4){
+      my_ylab <- ""
+    }
+    
+    matplot(mat, type = 'l', col = color.agg[agg_imethods], lty = 1, main = my_main, 
+            ylab = my_ylab, xlab = "Horizon")
+    if(level == 4)
+    legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .3)
+  }
+  avg_bot <- apply(crps_bot_byhour[, bot_imethods, , drop = F], c(1, 2), mean)
+  matplot(avg_bot, type = 'l', col = color.bot, lty = 1, ylab = "", xlab= "Horizon")
+}
+
+# MSE
+for(level in seq(4, 1)){
+  id <- which(depth_aggnodes == level)
+  mat <- apply(mse_agg_byhour[, agg_imethods, id, drop = F], c(1, 2), mean)
+  
+  my_ylab <- "MSE"
+  if(level != 4){
+    my_ylab <- ""
+  }
+  
+  matplot(mat, type = 'l', col = color.agg[agg_imethods], lty = 1, main = "", 
+          ylab = my_ylab, xlab = "Horizon")
+  if(level == 4)
+  legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .3)
+}
+avg_mse_bot <- apply(mse_bot_byhour[, bot_imethods, , drop = F], c(1, 2), mean)
+matplot(avg_mse_bot, type = 'l', col = color.bot, lty = 1, ylab = "", xlab= "Horizon")
+
+dev.off()
+#####################
+
+savepdf(file.path(results.folder, paste("AGG-WCRPS-LEVEL",sep = "") ), height = 27 * 0.3)
+
+for(level in seq(4, 1)){
+  id <- which(depth_aggnodes == level)
+  
+  par(mfrow = c(2, 3))
+  for(iweight in seq(5)){
+    
+    if(iweight == 1){
+      my_ylab <- "wCRPS (uniform)"
+    }else if(iweight == 2){
+      my_ylab <- "wCRPS (center)"
+    }else if(iweight == 3){
+      my_ylab <- "wCRPS (both tails)"
+    }else if(iweight == 4){
+      my_ylab <- "wCRPS (right tail)"
+    }else if(iweight == 5){
+      my_ylab <- "wCRPS (left tail)"
+    }
+    
+    mat <- apply(wcrps_agg_byhour[iweight, , agg_imethods, id, drop = F], c(2, 3), mean)
+    
+    matplot(mat, type = 'l', col = color.agg[agg_imethods], lty = 1, main = paste("level ", level, " - ", "(", length(id), ")", sep = ""), 
+            ylab = my_ylab, xlab = "Horizon")
+    legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .4)
+  }# iweight
+  plot.new()
+  
+  par(mfrow = c(1, 1))
+  mat <- apply(mse_agg_byhour[, agg_imethods, id, drop = F], c(1, 2), mean)
+  matplot(mat, type = 'l', col = color.agg[agg_imethods], lty = 1, main = paste("level ", level, " - ", "(", length(id), ")", sep = ""), 
+          ylab = my_ylab, xlab = "Horizon")
+  legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .4)
+  
+}# level
+
+bot_imethods <- c(1, 2)
+#
+avg_bot <- apply(crps_bot_byhour[, bot_imethods, , drop = F], c(1, 2), mean)
+matplot(avg_bot, type = 'l', col = color.bot, lty = 1, ylab = "CRPS", xlab= "Horizon")
+
+#
+avg_mse_bot <- apply(mse_bot_byhour[, bot_imethods, , drop = F], c(1, 2), mean)
+matplot(avg_mse_bot, type = 'l', col = color.bot, lty = 1, ylab = "MSE", xlab= "Horizon")
+
+dev.off()
+######
+
+
 
 
 savepdf(file.path(results.folder, paste("AGG-CRPS",sep = "") ), height = 27 * 0.3)
-par(mfrow = c(1, 2))
+#par(mfrow = c(1, 2))
 
+agg_imethods <- 1:7
 for(iagg in seq(n_agg)){
-    for(i in seq_along(set_methods)){
-      agg_imethods <- set_methods[[i]]
+    #for(i in seq_along(set_methods)){
+    #agg_imethods <- set_methods[[i]]
     matplot(crps_agg_byhour[, agg_imethods, iagg], type = 'l', col = color.agg[agg_imethods], lty = 1, main = sum(Sagg[iagg, ]), 
             ylab = "CRPS", xlab = "Horizon")
     legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .4)
+  #}
+}
+dev.off()
+
+savepdf(file.path(results.folder, paste("AGG-CRPS-LEVEL",sep = "") ), height = 27 * 0.3)
+par(mfrow = c(1, 2))
+for(level in seq(4, 1)){
+  id <- which(depth_aggnodes == level)
+  res <- apply(crps_agg_byhour[, , id, drop = F], c(1, 2), mean)
+  for(i in seq_along(set_methods)){
+    agg_imethods <- set_methods[[i]]
+    matplot(res[, agg_imethods], type = 'l', col = color.agg[agg_imethods], lty = 1, main = level, 
+            ylab = "CRPS", xlab = "Horizon")
+    legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .4)
+  }
+}
+
+avg_bot <- apply(crps_bot_byhour, c(1, 2), mean)
+matplot(avg_bot, type = 'l', col = color.bot, lty = 1)
+dev.off()
+
+savepdf(file.path(results.folder, paste("AGG-WCRPS",sep = "") ), height = 27 * 0.3)
+par(mfrow = c(1, 2))
+
+for(iagg in seq(n_agg)){
+  for(iweight in seq(5)){
+    
+    if(iweight == 1){
+      my_ylab <- "wCRPS (uniform)"
+    }else if(iweight == 2){
+      my_ylab <- "wCRPS (center)"
+    }else if(iweight == 3){
+      my_ylab <- "wCRPS (both tails)"
+    }else if(iweight == 4){
+      my_ylab <- "wCRPS (right tail)"
+    }else if(iweight == 5){
+      my_ylab <- "wCRPS (left tail)"
+    }
+      
+    for(i in seq_along(set_methods)){
+      agg_imethods <- set_methods[[i]]
+      matplot(wcrps_agg_byhour[iweight, ,agg_imethods, iagg], type = 'l', col = color.agg[agg_imethods], lty = 1, main = sum(Sagg[iagg, ]), 
+              ylab = my_ylab, xlab = "Horizon")
+      legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .4)
+    }
   }
 }
 dev.off()

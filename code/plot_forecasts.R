@@ -49,7 +49,7 @@ if(plot.permsamples){
   
 }else{
   do.agg <- T
-  alliseries <- c(10)
+  alliseries <- c(20)
   #algorithms <- c("DYNREG")
   #algorithms <- c("KD-IC-NML")
   algorithms <- c("DETS", "DYNREG")

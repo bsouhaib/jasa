@@ -430,6 +430,14 @@ mint_betastar <- function(W, y_hat){
   -adj
 }
 
+mint_pmatrix <- function(W){
+  MAT1 <- W %*% U
+  MAT2 <- crossprod(U,MAT1)
+  MAT3 <- tcrossprod(solve(MAT2), U)
+  C1 <- J %*% MAT1
+  J - C1 %*% MAT3
+}
+
 hasnoBottom <- function(algo){
   grepl("BU", algo) & !grepl("NNLS", algo) 
 }

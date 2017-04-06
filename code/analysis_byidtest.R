@@ -40,10 +40,10 @@ for(do.agg in c(TRUE, FALSE)){
     idseries <- set_series[j]
     
     load(file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")))
-
-    load(file.path(work.folder, "revisedf", paste("revised_meanf_", algo.agg, "_", algo.bottom, "_", idseries, ".Rdata", sep = "")) )
-    # mu_revised_alltest
-
+    #if(!do.agg){
+      load(file.path(work.folder, "revisedf/revised_ICML", paste("revised_meanf_", idseries, ".Rdata", sep = "")))
+      #}
+    
     if(do.agg){
       load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
       obs_agg[j, ] <- demand[test$id]
@@ -71,11 +71,11 @@ for(do.agg in c(TRUE, FALSE)){
 }# AGG and BOTTOM
 
 #stop("done")
-dir.create(file.path(work.folder, "byidtest"), recursive = TRUE, showWarnings = FALSE)
+dir.create(file.path(work.folder, "byidtest/byidtest_ICML"), recursive = TRUE, showWarnings = FALSE)
 
 for(idtest in seq(ntest)){
   print(idtest)
-  res_byidtest_file <- file.path(work.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = ""))
+  res_byidtest_file <- file.path(work.folder, "byidtest/byidtest_ICML", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = ""))
   
   QF_agg_idtest <- sapply(seq(length(aggSeries)), function(j){
     QF_agg[[j]][, idtest]
