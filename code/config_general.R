@@ -34,7 +34,11 @@ m_2 <- 336
 algo.agg <- "DETS"
 algo.bottom <- "KD-IC-NML"
 
+print("----")
 print(algo.agg)
 print(algo.bottom)
+print("----")
 
 
+
+#node_nbkids[node_order][seq(3)]

@@ -16,11 +16,11 @@ nperjobs=138
 #njobs=4
 #nperjobs=1104
 
-#njobs=62
-#nperjobs=72
+#njobs=64
+#nperjobs=69
 
 allijobs=$(seq 1 $njobs )
-allijobs=(2 4 7 10 20 27 32 33 34)
+allijobs=(6 7 14 26 32)
 
 for ijob in ${allijobs[@]}
 do

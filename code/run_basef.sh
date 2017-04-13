@@ -10,10 +10,10 @@ tag="agg"
   #algo="DYNREG"
 
 algo="DETS"
-njobs=36
-nperjobs=2
-  #njobs=55
-  #nperjobs=1
+#njobs=36
+#nperjobs=2
+njobs=55
+nperjobs=1
 
 #elif [[ "$doagg" -eq "FALSE" ]]; then
 

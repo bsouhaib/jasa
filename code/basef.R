@@ -9,8 +9,8 @@ if(length(args) == 0){
   #algo <- "DYNREG"
   algo <- "DETS"
     
-  do.agg <- F
-  alliseries <- c(354)
+  do.agg <- T
+  alliseries <- c(1)
 }else{
   
   for(i in 1:length(args)){
@@ -151,10 +151,15 @@ for(iseries in alliseries){
         id <- sort(E, index = T)$ix[1]
         res_optim <- optim(THETA[id, ], fn = func_to_optimize, y = ypast, e_0 = e_0, l_0 = l_0, d_0 = d_0, w_0 = w_0, do.forecast = F,
                            method = "L-BFGS-B", lower = 0, upper = 1)
+        if(id_future_day == 1){
+          param_file <- file.path(basef.folder, algo, paste("parameters_", idseries, "_", algo, ".Rdata", sep = "")) 
+          save(file = param_file, list = c("res_optim"))
+          #stop("done")
+        }
       }
         
       #if(id_future_day == 23)
-      #  stop("done")
+      #stop("done")
         
       obj_forecast <- iterate(res_optim$par, ypast, e_0, l_0, d_0, w_0, do.forecast = T)
       

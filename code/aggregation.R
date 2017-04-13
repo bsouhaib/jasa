@@ -319,6 +319,16 @@ for(idtest in allidtest){
       
     # a_tilde_test <- Sagg %*% P_mint %*% y_hat
     
+    # stop("done")
+    # library(MASS)
+    # n_bottom
+    # Xstandard <- mvrnorm(n = M, rep(0, n_bottom), diag(n_bottom))
+    # s <- svd(Sigma)
+    # b_tilde <- as.numeric(P_mint %*% t(t(y_hat)))
+    # V_bottom <- V_mint[seq(n_agg + 1, n_total), seq(n_agg + 1, n_total)]
+    # X <- mvrnorm(n = M, b_tilde, V_bottom)
+    # Y <- t(Sagg %*% t(X))
+    
    }
   ########################
   # ADJ MEANCOMB
@@ -502,11 +512,12 @@ for(idtest in allidtest){
   # botmethods_wcrps <- aperm(botmethods_wcrps, c(1, 3, 2))
   list_wcrps_bot[[idtest]] <- aperm(botmethods_wcrps, c(1, 3, 2))
   
+  #stop("done")
   
   #print(base::date())
+  print(warnings())
+  assign("last.warning", NULL, envir = baseenv())
 }# idtest
-
-stop("done")
 
 #avg_qscores_agg <- sum_overtest_qscores_agg/length(allidtest)
 #avg_qscores_bot <- sum_overtest_qscores_bot/length(allidtest)

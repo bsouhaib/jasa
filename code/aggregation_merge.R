@@ -8,6 +8,9 @@ library(igraph)
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
+node_nbkids <- apply(Sagg, 1, sum)
+node_order <- sort(node_nbkids, index = T, decreasing = T)$ix
+
 ntest <- length(test$id)
 n_bottom <- length(bottomSeries)
 
@@ -52,11 +55,11 @@ depth_aggnodes <- sapply(agg_nodes, function(agg_node){
 #agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
 #color.agg <- c("grey", "orange", "cyan", "purple", "darkgreen", "darkblue")
 
-bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
-color.bot <- c("black", "purple", "darkgreen", "darkblue")
+bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON", "PROBMINT")
+color.bot <- c("black", "purple", "darkgreen", "darkblue", "green")
 agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
-                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON", "NAIVEBU-MINT")
-color.agg <- c("black", "orange", "cyan", "purple", "darkgreen", "darkblue", "red", "pink")
+                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON", "NAIVEBU-MINT", "PROBMINT")
+color.agg <- c("black", "orange", "cyan", "purple", "darkgreen", "darkblue", "red", "pink", "green")
 
 agg_better_names <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2", "PERMBU-COMB")
 bot_better_names <- c("BASE", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2")
@@ -64,6 +67,8 @@ bot_better_names <- c("BASE", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2")
 
 wcrps_agg    <- array(NA, c(5, n_agg, ntest, length(agg_methods)))
 crps_agg    <- array(NA, c(n_agg, ntest, length(agg_methods)))
+
+wcrps_bottom <- array(NA, c(5, n_bottom, ntest, length(bot_methods)))
 crps_bottom <- array(NA, c(n_bottom, ntest, length(bot_methods)))
 
 mse_agg    <- array(NA, c(n_agg, ntest, length(agg_methods)))
@@ -83,21 +88,31 @@ for(idjob in seq(njobs)){
   res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
   load(res_job)
   
-  
-  list_wcrps_agg_nonull <- list_wcrps_agg[-which(sapply(list_wcrps_agg, is.null))]
-  mat_wcrps_agg <- sapply(seq_along(list_wcrps_agg_nonull),  function(i){list_wcrps_agg_nonull[[i]]}, simplify = 'array')
- 
-  
-  
+  # crps agg
   list_crps_agg_nonull <- list_crps_agg[-which(sapply(list_crps_agg, is.null))]
   mat_crps_agg <- sapply(seq_along(list_crps_agg_nonull),  function(i){list_crps_agg_nonull[[i]]}, simplify = 'array')
+  
+  # wcrps agg
+  list_wcrps_agg_nonull <- list_wcrps_agg[-which(sapply(list_wcrps_agg, is.null))]
+  mat_wcrps_agg <- sapply(seq_along(list_wcrps_agg_nonull),  function(i){list_wcrps_agg_nonull[[i]]}, simplify = 'array')
+  
+  # crps bot
   list_crps_bot_nonull <- list_crps_bot[-which(sapply(list_crps_bot, is.null))]
   mat_crps_bot <- sapply(seq_along(list_crps_bot_nonull),  function(i){list_crps_bot_nonull[[i]]}, simplify = 'array')
+  
+  # wcrps bot
+  list_wcrps_bot_nonull <- list_wcrps_bot[-which(sapply(list_wcrps_bot, is.null))]
+  mat_wcrps_bot <- sapply(seq_along(list_wcrps_bot_nonull),  function(i){list_wcrps_bot_nonull[[i]]}, simplify = 'array')
 
-  wcrps_agg[, , allidtest,]    <- aperm(mat_wcrps_agg, c(1, 2, 4, 3))
-  crps_agg[, allidtest,]     <- aperm(mat_crps_agg, c(1, 3, 2))
+  #
   crps_bottom[, allidtest, ] <- aperm(mat_crps_bot, c(1, 3, 2))
-  total_qscores_agg <- total_qscores_agg + avg_qscores_agg
+  wcrps_bottom[, , allidtest, ] <- aperm(mat_wcrps_bot, c(1, 2, 4, 3))
+  
+  crps_agg[, allidtest,]     <- aperm(mat_crps_agg, c(1, 3, 2))
+  wcrps_agg[, , allidtest,]    <- aperm(mat_wcrps_agg, c(1, 2, 4, 3))
+  
+  
+  #total_qscores_agg <- total_qscores_agg + avg_qscores_agg
   #total_qscores_bot <- total_qscores_bot + avg_qscores_bot
 
   list_mse_agg_nonull <- list_mse_agg[-which(sapply(list_mse_agg, is.null))]
@@ -109,7 +124,7 @@ for(idjob in seq(njobs)){
   mse_bottom[, allidtest,]     <- aperm(mat_mse_bot, c(1, 3, 2))
 }
 
-total_qscores_agg <- total_qscores_agg / njobs
+#total_qscores_agg <- total_qscores_agg / njobs
 #total_qscores_bot <- total_qscores_bot / njobs
 
 
@@ -144,6 +159,7 @@ crps_agg_byhour <- sapply(seq(n_agg), function(iagg){
   })
 }, simplify = 'array')
 
+# AGG WCRPS
 wcrps_agg_byhour <- sapply(seq(5), function(iweight){
   sapply(seq(n_agg), function(iagg){
     sapply(seq_along(agg_methods), function(imethod){
@@ -154,7 +170,39 @@ wcrps_agg_byhour <- sapply(seq(5), function(iweight){
 
 wcrps_agg_byhour <- aperm(wcrps_agg_byhour, c(4, 1, 2, 3))
 
+# BOT WCRPS
+wcrps_bot_byhour <- sapply(seq(5), function(iweight){
+  sapply(seq(n_bottom), function(ibot){
+    sapply(seq_along(bot_methods), function(imethod){
+      apply(matrix(wcrps_bottom[iweight, ibot, , imethod], ncol = 48, byrow = T), 2, mean)
+    })
+  }, simplify = 'array')
+}, simplify = 'array')
+
+wcrps_bot_byhour <- aperm(wcrps_bot_byhour, c(4, 1, 2, 3))
+
 stop("done")
+
+if(FALSE){
+  test <- sapply(seq(5), function(iweight){
+    sapply(seq(n_agg), function(iagg){
+      sapply(seq_along(agg_methods), function(imethod){
+        matrix(wcrps_agg[iweight, iagg, , imethod], ncol = 48, byrow = T)
+      }, simplify = 'array')
+    }, simplify = 'array')
+  }, simplify = 'array')
+  
+  day_remove <- sort(apply(test[, , 1, 3, 1], 1, mean), decreasing = T, index = T)$ix[seq(3)]
+  test <- test[-day_remove, , , , ]
+  wcrps_agg_byhour <- apply(test, c(2, 3, 4, 5), mean)
+  wcrps_agg_byhour <- aperm(wcrps_agg_byhour, c(4, 1, 2, 3))
+}
+
+
+
+# for(i in seq(5))
+# matplot(t(test[-day_remove, , 1, 3, i]), type = 'l')
+
 ##################
 # FIGURE ICML
 mymethods_agg <- c("BASE", "NAIVEBU",  "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", "PERMBU-MCOMBRECON")
@@ -297,10 +345,32 @@ if(FALSE){
 }
 
 #######
-#agg_imethods <- c(1:4, 6, 7, 8) 
-agg_imethods <- match(c("BASE", "NAIVEBU","PERMBU", "NAIVEBU-MINT", "PERMBU-MINT"), agg_methods)
-bot_imethods <- match(c("BASE", "BASE-MINT"), bot_methods) #c(1, 2)
+#agg_imethods <- match(c("BASE", "NAIVEBU","PERMBU", "NAIVEBU-MINT", "PERMBU-MINT", "PROBMINT"), agg_methods)
+#bot_imethods <- match(c("BASE", "BASE-MINT", "PROBMINT"), bot_methods) #c(1, 2)
 
+agg_imethods <- match(c("BASE", "NAIVEBU-MINT", "PERMBU-MINT", "PROBMINT", "NAIVEBU","PERMBU"), agg_methods)
+bot_imethods <- match(c("BASE", "BASE-MINT", "PROBMINT"), bot_methods) 
+
+
+#####
+if(FALSE){
+  ibase <- which(agg_methods[agg_imethods] == "BASE")
+  relative_wcrps_agg <- sapply(seq_along(agg_methods), function(imethod){
+    (wcrps_agg[, , , ibase] - wcrps_agg[, , , imethod])/wcrps_agg[, , , ibase]	
+  }, simplify = "array")
+  wcrps_agg_byhour <- sapply(seq(5), function(iweight){
+    sapply(seq(n_agg), function(iagg){
+      sapply(seq_along(agg_methods), function(imethod){
+        apply(matrix(relative_wcrps_agg[iweight, iagg, , imethod], ncol = 48, byrow = T), 2, mean)
+      })
+    }, simplify = 'array')
+  }, simplify = 'array')
+  wcrps_agg_byhour <- aperm(wcrps_agg_byhour, c(4, 1, 2, 3))
+}
+#####
+
+
+do.relative <- FALSE
 #####################
 savepdf(file.path(results.folder, paste("AGG-WCRPS-LEVEL",sep = "") ), height = 27 * 0.3)
 par(mfrow = c(3, 5))
@@ -325,6 +395,14 @@ for(iweight in c(1, 3)){
     
     mat <- apply(wcrps_agg_byhour[iweight, , agg_imethods, id, drop = F], c(2, 3), mean)
     
+   
+    if(do.relative){
+      ibase <- which(agg_methods[agg_imethods] == "BASE")
+      mat <- sapply(seq(ncol(mat)), function(imethod){
+        (mat[, ibase] - mat[, imethod])/mat[, ibase]
+      })
+    }
+    
     my_main <- paste("level ", level, " - ", "(", length(id), ")", sep = "")
     if(iweight != 1){
       my_main <- ""
@@ -335,17 +413,38 @@ for(iweight in c(1, 3)){
     
     matplot(mat, type = 'l', col = color.agg[agg_imethods], lty = 1, main = my_main, 
             ylab = my_ylab, xlab = "Horizon")
-    if(level == 4)
-    legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .3)
+    if(level == 4){
+      if(!do.relative){
+        legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .3)
+      }else{
+        legend("bottomright", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .3)
+      }
+    }
   }
-  avg_bot <- apply(crps_bot_byhour[, bot_imethods, , drop = F], c(1, 2), mean)
-  matplot(avg_bot, type = 'l', col = color.bot, lty = 1, ylab = "", xlab= "Horizon")
+  #avg_bot <- apply(crps_bot_byhour[, bot_imethods, , drop = F], c(1, 2), mean)
+  avg_bot <- apply(wcrps_bot_byhour[iweight, , bot_imethods, , drop = F], c(2, 3), mean)
+  
+  if(do.relative){
+    ibase <- which(bot_methods[bot_imethods] == "BASE")
+    avg_bot <- sapply(seq(ncol(avg_bot)), function(imethod){
+      (avg_bot[, ibase] - avg_bot[, imethod])/avg_bot[, ibase]
+    })
+  }
+  
+  matplot(avg_bot, type = 'l', col = color.bot[bot_imethods], lty = 1, ylab = "", xlab= "Horizon")
 }
 
 # MSE
 for(level in seq(4, 1)){
   id <- which(depth_aggnodes == level)
   mat <- apply(mse_agg_byhour[, agg_imethods, id, drop = F], c(1, 2), mean)
+  
+  if(do.relative){
+    ibase <- which(agg_methods[agg_imethods] == "BASE")
+    mat <- sapply(seq(ncol(mat)), function(imethod){
+      (mat[, ibase] - mat[, imethod])/mat[, ibase]
+    })
+  }
   
   my_ylab <- "MSE"
   if(level != 4){
@@ -358,12 +457,20 @@ for(level in seq(4, 1)){
   legend("topleft", agg_methods[agg_imethods], col = color.agg[agg_imethods], lty = 1, cex = .3)
 }
 avg_mse_bot <- apply(mse_bot_byhour[, bot_imethods, , drop = F], c(1, 2), mean)
-matplot(avg_mse_bot, type = 'l', col = color.bot, lty = 1, ylab = "", xlab= "Horizon")
+
+if(do.relative){
+  ibase <- which(bot_methods[bot_imethods] == "BASE")
+  avg_mse_bot <- sapply(seq(ncol(avg_mse_bot)), function(imethod){
+    (avg_mse_bot[, ibase] - avg_mse_bot[, imethod])/avg_mse_bot[, ibase]
+  })
+}
+
+matplot(avg_mse_bot, type = 'l', col = color.bot[bot_imethods], lty = 1, ylab = "", xlab= "Horizon")
 
 dev.off()
 #####################
 
-savepdf(file.path(results.folder, paste("AGG-WCRPS-LEVEL",sep = "") ), height = 27 * 0.3)
+savepdf(file.path(results.folder, paste("OLDDDDDAGG-WCRPS-LEVEL",sep = "") ), height = 27 * 0.3)
 
 for(level in seq(4, 1)){
   id <- which(depth_aggnodes == level)

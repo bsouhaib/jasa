@@ -8,6 +8,7 @@ source("utils.R")
 load(file.path(work.folder, "myinfo.Rdata"))
 
 plot.permsamples <- FALSE
+#plot.permsamples <- TRUE
 if(plot.permsamples){
   do.agg <- T
   alliseries <- c(1)
@@ -48,21 +49,47 @@ if(plot.permsamples){
   })
   
 }else{
-  do.agg <- T
-  alliseries <- c(20)
+  do.agg <- F
+  alliseries <- c(1267)
   #algorithms <- c("DYNREG")
   #algorithms <- c("KD-IC-NML")
-  algorithms <- c("DETS", "DYNREG")
-  
+  #algorithms <- c("DETS")
+
   idays <- seq(1, 92, by = 1)
+  
+  do.jasa <- TRUE
+  if(do.jasa){
+    alliseries <- c(1, 1453)
+    series_isagg <- c(TRUE, FALSE)
+    idays <- c(10)
+  }
 }
-tag <- alliseries;
+
+tag <- "example"
+#tag <- alliseries;
+
 only.future <- FALSE
 
-savepdf(file.path(results.folder, paste("PLOT_forecasts_", tag, sep = "") ))
+
+
+if(do.jasa){
+  savepdf(file.path(results.folder, paste("PLOT_forecasts_", tag, sep = "")), height = 27 * 0.25, width = 21)
+  par(mfrow = c(1, 2))
+}else{
+  savepdf(file.path(results.folder, paste("PLOT_forecasts_", tag, sep = "") ))
+}
 
 for(iseries in alliseries){
   #savepdf(file.path(results.folder, paste("PLOT_forecasts_", iseries, "_", tag, sep = "") ))
+  
+  if(do.jasa){
+    do.agg <- series_isagg[which(iseries == alliseries)]
+    if(do.agg){
+      algorithms <- "DETS"
+    }else{
+      algorithms <- "KD-IC-NML"
+    }
+  }
   
   print(iseries)
   if(do.agg){
@@ -73,7 +100,7 @@ for(iseries in alliseries){
     load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
   }
   
-  if(TRUE){
+  if(FALSE){
     ############ PLOT the time series ############
     par(mfrow = c(2, 1))
     nly <- c(31,28,31,30,31,30,31,31,30,31,30,31)
@@ -100,7 +127,10 @@ for(iseries in alliseries){
     ######
   }
   
-  par(mfrow = c(2, 2))
+  if(!do.jasa){
+    par(mfrow = c(2, 2))
+  }
+  
   list_load <- vector("list", length(algorithms))
   for(ialgo in seq_along(algorithms)){
     algo <- algorithms[ialgo]
@@ -185,7 +215,7 @@ for(iseries in alliseries){
         myYLIM <- c(day_min, day_max)
         
         plotQF(qf_allhours, future, subtaus, id = seq(48), only.future = only.future,
-               main = mymain, xlab = "Time", ylab = "Electricity demand", xaxt='n', cex.lab = 1.2, ylim = myYLIM)
+               main = mymain, xlab = "Time", ylab = "Electricity demand (kWh)", xaxt='n', cex.lab = 1.2, ylim = myYLIM)
         axis(1, labels = tday, at = seq(1, 48))
         lines(mu_hat[iday, ], col = "red")
 
