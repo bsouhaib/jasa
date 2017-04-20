@@ -74,3 +74,34 @@ for(covmethod in covmethods){
   save(file = W1file, list = c("W1"))
 }
 
+if(TRUE){
+  allh <- tail(calendar$periodOfDay[learn$id], -n_past_obs_kd)
+  
+  for(h in seq(48)){
+    
+    #id <- which(allh == h)
+    seth <- c(h -1, h, h + 1)
+    if(h == 1){
+      seth <- c(48, 1, 2)
+    }else if(h == 48){
+      seth <- c(47, 48, 1)
+    }
+    stopifnot(h %in% seq(48))
+    
+    id <- which(allh %in% seth)
+    
+    R <- R_onestep[id, ]
+    
+    # shrink
+    Whfile <- file.path(work.folder, "wmatrices", paste("W_", h, "_", algo.agg, "_", algo.bottom, "_", "shrink", ".Rdata", sep = ""))
+    target_diagonal <- lowerD(R)
+    shrink_results <- shrink.estim(R, target_diagonal)
+    W1 <- shrink_results$shrink.cov
+    save(file = Whfile, list = c("W1"))
+    
+    # diagonal
+    Whfile <- file.path(work.folder, "wmatrices", paste("W_", h, "_", algo.agg, "_", algo.bottom, "_", "diagonal", ".Rdata", sep = ""))
+    W1 <- Diagonal(x = vec_w(R))
+    save(file = Whfile, list = c("W1"))
+  }
+}

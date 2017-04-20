@@ -1,19 +1,18 @@
 rm(list = ls())
-set.seed(1987)
 args = (commandArgs(TRUE))
 if(length(args) == 0){
-  do.agg <- F
-  alliseries <- c(1, 2, 128) #  c(1406) 
+  idjob <- 1
+  allidtest <- seq(1, 4416, by = 48) # seq(35, 4416, by = 48) #1:4 #1:123 #1:4 #1:1104 
 }else{
   
-  for(i in 1:length(args)){
-    print(args[[i]])
-  }
+  #for(i in 1:length(args)){
+  #  print(args[[i]])
+  #}
   
-  do.agg <- as.logical(args[[1]])
-  alliseries <- NULL
+  idjob <- as.numeric(args[[1]])
+  allidtest <- NULL
   for(i in seq(2, length(args))){
-    alliseries <- c(alliseries, as.numeric(args[[i]]))
+    allidtest <- c(allidtest, as.numeric(args[[i]]))
   }
 }
 source("config_paths.R")
@@ -23,173 +22,514 @@ source("jasa_utils.R")
 source("utils.R")
 library(igraph)
 library(Matrix)
-library(glmnet)
+library(quadprog)
 
-#library(quantreg)
-#library(rqPen)
-print(base::date())
+set.seed(1986)
+
+
+algo.agg <- "DETS"
+algo.bottom <- "KD-IC-NML"
+
+MAT <- MAT2 <- NULL
+
+compute_crps <- function(methods, n, mat_samples, observations){
+  res <- sapply(seq_along(methods), function(imethod){
+    sapply(seq(n), function(i){
+      crps_sampling(mat_samples[, i, imethod], observations[i])
+    })
+  })
+  colnames(res) <- methods
+  res
+}
+
+OLD_compute_qscores <- function(methods, n, mat_samples, observations){
+  print(base::date())
+  sorted_samples <- apply(mat_samples, c(2, 3), sort)
+  print(base::date())
+  qscores <- sapply(seq(n), function(i){
+    obs <- observations[i]
+    sapply(seq_along(methods), function(imethod){
+      sapply(seq(length(q_probs)), function(iprob){
+        qf <- sorted_samples[iprob, i, imethod]
+        2 * ((obs <= qf) - q_probs[iprob]) * (qf - obs)
+      })
+    })
+  }, simplify = 'array')
+  print(base::date())
+  qscores
+}
+
+weighted_crps <- function(qscores, weights){
+  sum(qscores * weights)/length(qscores)
+}
+
+compute_qscores <- function(methods, n, mat_samples, observations){
+  sorted_samples <- apply(mat_samples, c(2, 3), sort)
+  qscores <- sapply(seq(n), function(i){
+    obs <- observations[i]
+    sapply(seq_along(methods), function(imethod){
+      qf <- sorted_samples[, i, imethod]
+      2 * ((obs <= qf) - q_probs) * (qf - obs)      
+    })
+  }, simplify = 'array')
+  qscores
+}
+
+#if(idjob == 34){
+#  allidtest <- 4291:4416
+#}
+
+print(allidtest)
+
 
 load(file.path(work.folder, "myinfo.Rdata"))
+n_bottom <- length(bottomSeries)
 
-#library(doParallel)
-#registerDoParallel(4)
+bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON", "PROBMINT")
+agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
+                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON", "NAIVEBU-MINT", "PROBMINT")
 
-if(do.agg){
-  maxit <- 10000
-  nlambda <- 100
-}else{
-  maxit <- 2000
-  nlambda <- 50
-}
-nfolds <- 5
-myalpha <- 1
+#bot_methods <- c("BASE", "BASE-MINT")
+#agg_methods <- c("BASE", "NAIVEBU", "PERMBU")
 
-#seth <- vector("list", 2)
-#seth[[1]] <- c(1:12, 41:48)
-#seth[[1]] <- c(1:10, 43:48)
-#seth[[2]] <- setdiff(1:48, seth[[1]])
+do.mint <- any(c(grepl("MINT", bot_methods), grepl("MINT", agg_methods)))
+do.myrevmean <- any(c(grepl("MCOMB", bot_methods), grepl("MCOMB", agg_methods)))
 
-if(do.agg){
-  seth <- vector("list", 3)
-  seth[[1]] <- 1:10
-  seth[[2]] <- 11: 42
-  seth[[3]] <- 43:48
-}else{
-  seth <- vector("list", 17)
-  for(i in seq(10)){seth[[i]] <- i}
-  seth[[11]] <- c(11: 42)
-  for(i in seq(12, 17)){seth[[i]] <- i + 31}
+if(do.mint){
+  covmethod <- c("shrink")
+  #W1file <- file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", covmethod, ".Rdata", sep = "")) 
+  
+  #load(W1file)
+  J <- Matrix(cbind(matrix(0, nrow = n_bottom, ncol = n_agg), diag(n_bottom)), sparse = TRUE)
+  U <- Matrix(rbind(diag(n_agg), -t(Sagg)), sparse = TRUE)
 }
 
-#seth <- vector("list", 1)
-#seth[[1]] <- 1:48
+P_bu <- cbind(matrix(0, nrow = n_bottom, ncol = n_agg), diag(n_bottom))
+n_total <- n_agg + n_bottom
+weights_GTOP <- rep(1, n_agg + n_bottom)
+Rmat <- diag(sqrt(weights_GTOP))
 
+##########
+# compute the parsing order of the aggregate nodes
+leaves <- V(itree)[degree(itree, mode="out") == 0]
+agg_nodes <- V(itree)[degree(itree, mode="out") != 0]
 
+depth_aggnodes <- sapply(agg_nodes, function(agg_node){
+  vec <- distances(itree, agg_node, leaves, mode = "out")
+  max( vec[which(vec!=Inf)])
+})
 
-do.shrink_towards_base <- TRUE
-include.calendar <- TRUE
-use.intercept <- TRUE
+ordered_agg_nodes_names <- names(sort(depth_aggnodes))
+ordered_agg_nodes <- V(itree)[match(ordered_agg_nodes_names, V(itree)$name)]
+##########
 
-for(iseries in alliseries){
-  print(base::date())
-  
-  # HERE !!!!!!
-  matrix_file <- file.path(work.folder, "revisedf", paste("revised_meanf_Xmatrix_", algo.agg, "_", algo.bottom, ".Rdata", sep = "")) 
-  load(matrix_file)
-  
-  allvar <- colnames(Xhat_learn)
-  stopifnot(all(allvar == colnames(Xhat_test)))
-  
-  print(iseries)
-  if(do.agg){
-    idseries <- aggSeries[iseries]
-    load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
-  }else{
-    idseries <- bottomSeries[iseries]
-    load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
-  }
-  
-  
-  demand_idseries <- demand
-  
-  y_learn <- demand_idseries[learn$id]
-  y_test <- demand_idseries[test$id]
-  
-  if(!do.agg && do.shrink_towards_base){
-    col_iseries <- match(idseries, allvar)
-    y_learn <- y_learn - Xhat_learn[, col_iseries]
-  }
-  
-  # remove na
-  ikeep <- which(complete.cases(Xhat_learn))
-  Xhat_learn <- Xhat_learn[ikeep, ]
-  y_learn <- y_learn[ikeep]
-  pday_learn <- pday_learn[ikeep]
-  
-  nlearn <- nrow(Xhat_learn)
-  #itrain <- seq(round(0.75*nlearn)) 
-  #ivalid <- setdiff(seq(nlearn), itrain)
-  #Xhat_train <- Xhat_learn[itrain, ]; y_train <- y_learn[itrain]
-  #Xhat_valid <- Xhat_learn[ivalid, ]; y_valid <- y_learn[ivalid]
-  
-  n_test <- nrow(Xhat_test)
-  mu_revised_alltest <- numeric(n_test)
-  
- 
-  
-  for(i in seq_along(seth)){
-    #print(i)
-    h_set <- seth[[i]]
+#alliseries <- seq(length(bottomSeries))
+ntest <- length(test$id)
+#allidtest <- seq(ntest)
+#list_results_agg_perm <- list_results_agg_naive <- list_results_agg_base <- list_obs_agg  <- vector("list", ntest)
 
-    idh_learn <- which(pday_learn %in% h_set)
-    Xhat_learn_h <- Xhat_learn[idh_learn, ]
-    y_learn_h <- y_learn[idh_learn]
-    
-    # Reduce size of the dataset by removing far away days
-    #nbdays_learn <- nrow(Xhat_learn_h)/length(h_set)
-    
-    if(FALSE){
-      if(i == 1){
-        nremove <- 100 * length(h_set)
-        Xhat_learn_h <- tail(Xhat_learn_h, -nremove) # 4320 left vs 6320
-        y_learn_h    <- tail(y_learn_h,    -nremove)
-      }else if(i == 2){
-        nremove <- 150 * length(h_set)
-        Xhat_learn_h <- tail(Xhat_learn_h, -nremove) # 4648 left vs 8648
-        y_learn_h    <- tail(y_learn_h,    -nremove)
-      }
-    }
-    
-    
-    
-    idh_test <- which(pday_test %in% h_set)
-    Xhat_test_h <- Xhat_test[idh_test, ]
-    #y_test_h <- y_test[idh_test]
-    
-    # CROSS-VALIDATION
-    n <- nrow(Xhat_learn_h)
-    foldid <- rep(seq(nfolds), each = ceiling(n/nfolds))
-    foldid <- head(foldid, n)
-    
-    #print("doing glmnet")
-    model_seqlambda <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, intercept = use.intercept, nlambda = nlambda, maxit = maxit)
-    #print("doing cv ...")
-    res <- cv.glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, intercept = use.intercept,  foldid = foldid, lambda = model_seqlambda$lambda, maxit = maxit)
-    best_lambda <-  res$lambda.1se
-    
-    ids_nonzero <- which(as.numeric(coef(model_seqlambda, s = best_lambda)) != 0)
-    if( (!do.agg && do.shrink_towards_base) && length(ids_nonzero) == 1 && ids_nonzero == 1 ){
-      mu_revised_alltest[idh_test] <- 0
+list_crps_agg <- list_wcrps_agg <- list_qscores_agg <- list_mse_agg <- vector("list", ntest)
+list_crps_bot <- list_wcrps_bot <- list_mse_bot  <- vector("list", ntest)
+  
+list_samples_agg <- vector("list", ntest)
+sum_overtest_qscores_agg <- sum_overtest_qscores_bot <- 0
+
+# LOADING PERMUTATION FILE
+perm_file <- file.path(permutations.folder, paste("perm_", algo.agg, "_", algo.bottom, ".Rdata", sep = "")) 
+load(perm_file) # "list_matpermutations" "list_vecties"
+
+# Generate samples
+for(idtest in allidtest){
+  print(idtest)
+  #print(base::date())
+  #if(idtest%%48 == 0)
+  #{ 
+  #  print(idtest)
+  #  print(base::date())
+  #}
+  
+  res_byidtest_file <- file.path(work.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
+  load(res_byidtest_file)
+  # "QF_agg_idtest", "QF_bottom_idtest", "obs_agg_idtest", "obs_bottom_idtest", 
+  # "revisedmean_bottom_idtest", 'revisedmean_agg_idtest', "mean_agg_idtest", "mean_bottom_idtest"
+  
+  iday <- getInfo(idtest)$iday
+  hour <- getInfo(idtest)$hour
+  
+  #Q <- matrix(NA, nrow = M, ncol = length(alliseries))
+  #colnames(Q) <- bottomSeries[alliseries]
+
+  for(do.agg in c(TRUE, FALSE)){
+    if(do.agg){
+      set_series <- aggSeries
+      algo <- algo.agg
+      base_samples_agg <- matrix(NA, nrow = M, ncol = length(set_series))
+      colnames(base_samples_agg) <- set_series
     }else{
-      mu_revised_alltest[idh_test] <- as.numeric(predict(model_seqlambda, newx = Xhat_test_h, s = best_lambda))
+      set_series <- bottomSeries
+      algo <- algo.bottom
+      base_samples_bottom <- matrix(NA, nrow = M, ncol = length(set_series))
+      colnames(base_samples_bottom) <- set_series
     }
-    
-    if(FALSE){
-      #model_seqlambda <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, intercept = use.intercept, nlambda = nlambda)
-      #res <- cv.glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, 
-      #                 intercept = use.intercept,  foldid = foldid, lambda = model_seqlambda$lambda)
-      res <- cv.glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, intercept = use.intercept,  foldid = foldid, nlambda = nlambda)
-      best_lambda <-  res$lambda.1se
+    for(j in seq_along(set_series)){
+      #if(j%%100 == 0)
+      #print(j)
       
-      model_final <- glmnet(y = y_learn_h, x = Xhat_learn_h, alpha = myalpha, 
-                            lambda = best_lambda, intercept = use.intercept)
-      mu_revised_alltest[idh_test] <- as.numeric(predict(model_final, Xhat_test_h))
-    }
-    #beta <- as.numeric(model_final$beta)
-    #id <- which(beta != 0)
-    #print("---")
-    #print(id)
-    #print("---")
+      #iseries <- alliseries[j]
+      idseries <- set_series[j]
+      
+      #res_file <- file.path(basef.folder, algo, paste("results_", idseries, "_", algo, ".Rdata", sep = "")) 
+      #load(res_file)
+      
+      #if(algo == "Uncond" || algo == "PeriodOfDay"){
+        #
+      #}else if(algo == "DYNREG"){	
+      #  invcdf <- approxfun(taus, QF_agg_idtest[, j], rule = 2)
+      #}else if(algo == "KD-IC-NML"){	
+      #  invcdf <- approxfun(taus, QF_bottom_idtest[, j], rule = 2)
+      #}else{
+      #  stop("error")
+      #}
+      
+      if(do.agg){
+        invcdf <- approxfun(taus, QF_agg_idtest[, j], rule = 2)
+        base_samples_agg[, j]    <- invcdf(q_probs)
+      }else{
+        invcdf <- approxfun(taus, QF_bottom_idtest[, j], rule = 2)
+        base_samples_bottom[, j] <- invcdf(q_probs)
+      }
+      #Q[, j] <- invcdf(q_probs)
+    }# series
     
-    if(!do.agg && do.shrink_towards_base){
-      mu_revised_alltest[idh_test] <- mu_revised_alltest[idh_test] + Xhat_test_h[, col_iseries]
-    }
-  }
+  }# agg and bottom
   
-  #print(warnings())
-  #browser()
+  # rank_X <- apply(Q, 2, rank, ties.method = "random")
+  # I know that the rank of each observations is 1 --> M
+  perm_samples_bottom <- base_samples_bottom
+  variables <- colnames(perm_samples_bottom)
+
+
+  
+  mat_test <- NULL
+  # PERM-BU
+  for(inode in seq_along(ordered_agg_nodes)){
+    #print(inode)
+
+    agg_node <- ordered_agg_nodes[inode]
+    idseries_agg <- names(agg_node)
+    iagg <- match(idseries_agg, aggSeries)
+    children_nodes <- ego(itree, order = 1, nodes = agg_node, mode = "out")[[1]][-1]
+    nkids <- length(children_nodes)
+    
+    
+    # load permutation file
+    #perm_file <- file.path(permutations.folder, paste("perm_", algo.agg, "_", algo.bottom, "_", idseries_agg, ".Rdata", sep = ""))
+    #load(perm_file) # c("list_permutations", "list_ties")
+    mat_permutations <- list_matpermutations[[idseries_agg]]
+    
+    ranks_historical <- mat_permutations
+    stopifnot(all(colnames(ranks_historical) == names(children_nodes)))
+    
+    depth_node <- depth_aggnodes[match(idseries_agg, names(depth_aggnodes))]
+    
+    samples_children <- matrix(NA, nrow = M, ncol = nkids)
+    
+    columns_agg <- which(children_nodes %in% agg_nodes)
+    columns_bottom <- which(children_nodes %in% leaves)
+    children_names <- names(children_nodes)
+    
+    # Extracting/computing the samples for each child
+    if(length(columns_agg) > 0){
+      id_agg_children  <- match(children_names[columns_agg], aggSeries)
+      samples_agg_children <- t(tcrossprod(Sagg[id_agg_children, , drop = F], perm_samples_bottom))
+      samples_children[, columns_agg] <- samples_agg_children
+    }
+    
+    if(length(columns_bottom) > 0){
+      id_bottom_children  <- match(children_names[columns_bottom], bottomSeries)
+      samples_children[, columns_bottom] <- perm_samples_bottom[, id_bottom_children]
+    }
+    
+    # Computing the ranks of the samples for each child
+    ranks_samples_children <- sapply(seq(ncol(samples_children)), function(j){
+      rank(samples_children[, j], ties.method = "random")
+    })
+    
+    index_mat <- sapply(seq(nkids), function(j){
+      res <- match(ranks_historical[, j], ranks_samples_children[, j])
+      stopifnot(all(!is.na(res)))
+      res
+    })
+    
+    # Permutating the rows
+    if(length(columns_bottom) > 0){
+      perm_samples_bottom[, id_bottom_children] <- sapply(seq_along(id_bottom_children), function(j){
+        perm_samples_bottom[index_mat[, columns_bottom[j]], id_bottom_children[j]]
+      })
+    }
+    
+    if(length(columns_agg) > 0){
+      res <- lapply(seq_along(id_agg_children), function(j){
+        id <- which(Sagg[id_agg_children[j], ] == 1)
+        #print(id)
+        #print("---")
+        perm_samples_bottom[index_mat[, columns_agg[j]], id, drop = F]
+      })
+      ids <- lapply(id_agg_children, function(id_agg_child){
+        which(Sagg[id_agg_child, ] == 1)
+      })
+      ids <- unlist(ids)
+      perm_samples_bottom[, ids] <- do.call(cbind, res)
+    }
+
+  }# agg node
+  
+  # PERM-BU
+  #list_results_agg_perm[[idtest]] <- perm_samples_agg <- t(tcrossprod(Sagg, perm_samples_bottom))
+  
+  # NAIVE-BU - shuffle the samples 
+  #list_results_agg_naive[[idtest]] <- naivebu_samples_agg <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
+  
+  # BASE
+  #list_results_agg_base[[idtest]] <- base_samples_agg
+  
+  #list_obs_agg[[idtest]] <- obs_agg_idtest
+  
+  ###### MINT ############
+  #  adjustments 
+  if(do.mint){
+    #print("MINT")
+    
+    #b_hat <- apply(base_samples_bottom, 2, mean)
+    #a_hat <- apply(base_samples_agg, 2, mean)
+    b_hat <- mean_bottom_idtest
+    a_hat <- mean_agg_idtest 
+    
+    w.case <- 2
+    if(w.case == 1){
+      hwanted <- idtest%%48
+      if(hwanted == 0)
+        hwanted <- 48
+        
+      Whfile <- file.path(work.folder, "wmatrices", paste("W_", hwanted, "_", algo.agg, "_", algo.bottom, "_", "shrink", ".Rdata", sep = ""))
+      load(Whfile)
+    }else if(w.case == 2){
+      Wfile <- file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", "shrink", ".Rdata", sep = ""))
+      load(Wfile)
+    }else if(w.case == 3){
+      Wfile <- file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", "diagonal", ".Rdata", sep = ""))
+      load(Wfile)
+    }
+    
+    y_hat <- c(a_hat, b_hat)
+    adj_bottom_MINT <- mint_betastar(W1, y_hat = y_hat)
+    adj_agg_MINT    <- Sagg %*% adj_bottom_MINT
+    
+    adj_bottom_MINT <- as.numeric(adj_bottom_MINT)
+    adj_agg_MINT    <-  as.numeric(adj_agg_MINT)
+    
+    revisedMINT_bottom_idtest <- mean_bottom_idtest + adj_bottom_MINT
+    #print("MINT done")
+    #print(base::date())
+    
+    # MINT Variance
+    P_mint <- mint_pmatrix(W1)
+    S <- rbind(Sagg, diag(n_bottom))
+    V_mint <- S %*% P_mint %*% W1 %*% t(P_mint) %*% t(S)
+    
+    Vmint_agg <- diag(V_mint)[seq(n_agg)]
+    Vmint_bot <- diag(V_mint)[seq(n_agg + 1, n_total)]
+      
+    # a_tilde_test <- Sagg %*% P_mint %*% y_hat
+    
+    # stop("done")
+    # library(MASS)
+    # n_bottom
+    # Xstandard <- mvrnorm(n = M, rep(0, n_bottom), diag(n_bottom))
+    # s <- svd(Sigma)
+    # b_tilde <- as.numeric(P_mint %*% t(t(y_hat)))
+    # V_bottom <- V_mint[seq(n_agg + 1, n_total), seq(n_agg + 1, n_total)]
+    # X <- mvrnorm(n = M, b_tilde, V_bottom)
+    # Y <- t(Sagg %*% t(X))
+    
+   }
+  ########################
+  # ADJ MEANCOMB
   #stop("done")
   
-  res_file <- file.path(work.folder, "revisedf", paste("revised_meanf_", algo.agg, "_", algo.bottom, "_", idseries, ".Rdata", sep = "")) 
-  save(file = res_file, list = c("mu_revised_alltest"))
-}
+  if(do.myrevmean){
+    #print("GTOP")
+    
+    new.gtop <- TRUE
+    if(new.gtop){
+      y_check <- c(revisedmean_agg_idtest, revisedmean_bottom_idtest)
+      rev_and_reconcilied_mean_idtest <- gtop(y_check, Rmat, n_agg, n_total, Sagg, P_bu)
+      rev_and_reconcilied_bottom_mean_idtest <- P_bu %*% rev_and_reconcilied_mean_idtest
+      
+      # adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
+      # adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest) + as.numeric(- revisedmean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
+      # adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
+      #revisedmean_bottom_idtest <- rev_and_reconcilied_bottom_mean_idtest
+      
+      adj_bottom_mcomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest)
+      adj_agg_mcomb    <- as.numeric(Sagg %*% adj_bottom_mcomb)
+        
+      adj_bottom_mcombrecon <- as.numeric(-mean_bottom_idtest + rev_and_reconcilied_bottom_mean_idtest)
+      adj_agg_mcombrecon    <- as.numeric(Sagg %*% adj_bottom_mcombrecon)
+
+      # unreconcilied
+      # WRONG !! #adj_agg_mcombunrecon <-  as.numeric(-mean_agg_idtest + revisedmean_agg_idtest)
+      adj_agg_mcombunrecon <-  as.numeric(-Sagg %*% mean_bottom_idtest + revisedmean_agg_idtest)
+      
+     }else{
+      # OLD MEANCOMB
+      adj_bottom_meancomb <- as.numeric(-mean_bottom_idtest + revisedmean_bottom_idtest)
+      adj_agg_meancomb    <- as.numeric(Sagg %*% adj_bottom_meancomb)
+     }
+    #print("MCOMB done")
+    #print(base::date())
+  }
+  
+  #stop("done")
+  
+  #print(base::date())
+  
+  ######################## BOTTOM
+  samples_bot <- array(NA, c(M, n_bottom, length(bot_methods)))
+  meanf_bot   <- matrix(NA, nrow = n_bottom, ncol = length(bot_methods))
+  for(ibot_method in seq_along(bot_methods)){
+    bot_method <- bot_methods[ibot_method]
+    if(bot_method == "BASE"){
+      samples_bot_method <- base_samples_bottom
+      meanf_bot_method <- mean_bottom_idtest
+    }else if(bot_method == "BASE-MINT"){
+      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_MINT)
+      meanf_bot_method <- revisedMINT_bottom_idtest
+    }else if(bot_method == "BASE-MCOMB"){
+      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_mcomb)
+      meanf_bot_method <- revisedmean_bottom_idtest
+    }else if(bot_method == "BASE-MCOMBRECON"){
+      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_mcombrecon)
+      meanf_bot_method <- rev_and_reconcilied_bottom_mean_idtest
+    }else if(bot_method == "PROBMINT"){
+      meanf_bot_method <- revisedMINT_bottom_idtest
+      id_negative <- which(meanf_bot_method < 0)
+      meanf_bot_method[id_negative] <- mean_bottom_idtest[id_negative]
+      varf_bot_method  <- Vmint_bot
+      
+      samples_bot_method <- sapply(seq(n_bottom), function(ibot){
+        m <- meanf_bot_method[ibot]
+        v <- varf_bot_method[ibot]
+        
+        mulog <- log(m/sqrt(1+(v/m^2)))
+        sdlog <- sqrt(log(1+(v/m^2)))
+        
+        qlnorm(q_probs, mulog, sdlog)
+      })
+      
+    }else{
+      stop("error")
+    }
+    samples_bot[, , ibot_method] <- samples_bot_method
+    meanf_bot[, ibot_method] <- meanf_bot_method
+  }
+
+  # MSE
+  mse_matrix_bottom <- (meanf_bot - obs_bottom_idtest)^2
+  list_mse_bot[[idtest]] <- mse_matrix_bottom
+  
+  # CRPS
+  botmethods_crps <- compute_crps(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
+  list_crps_bot[[idtest]] <- botmethods_crps
+  
+  # QS
+  qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
+  #sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
+  
+  ######################## AGG
+  samples_agg <- array(NA, c(M, n_agg, length(agg_methods)))
+  meanf_agg   <- matrix(NA, nrow = n_agg, ncol = length(agg_methods))
+  
+  for(iagg_method in seq_along(agg_methods)){
+    agg_method <- agg_methods[iagg_method]
+    if(agg_method == "BASE"){
+      samples_agg_method <- base_samples_agg
+      meanf_agg_method <- mean_agg_idtest
+    }else if(agg_method == "NAIVEBU"){
+      samples_agg_method <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
+      meanf_agg_method <- (Sagg %*% mean_bottom_idtest)
+    }else if(agg_method == "PERMBU"){
+      samples_agg_method <- t(tcrossprod(Sagg, perm_samples_bottom))
+      meanf_agg_method <- (Sagg %*% mean_bottom_idtest)
+    #}else if(agg_method == "NAIVEBU-MINT"){
+    #  samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU", agg_methods)]) + adj_agg_MINT)
+    }else if(agg_method == "PERMBU-MINT"){
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_MINT)
+      meanf_agg_method <- (Sagg %*% revisedMINT_bottom_idtest)
+    }else if(agg_method == "NAIVEBU-MINT"){
+      samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU" , agg_methods)]) + adj_agg_MINT)
+      meanf_agg_method <- (Sagg %*% revisedMINT_bottom_idtest)
+    }else if(agg_method == "PERMBU-MCOMB"){
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcomb)
+      meanf_agg_method <- (Sagg %*% revisedmean_bottom_idtest)
+    }else if(agg_method == "PERMBU-MCOMBRECON"){
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcombrecon)
+      meanf_agg_method <- (Sagg %*% rev_and_reconcilied_bottom_mean_idtest)
+    }else if(agg_method == "PERMBU-MCOMBUNRECON"){
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcombunrecon)
+      meanf_agg_method <- revisedmean_agg_idtest
+    }else if(agg_method == "PROBMINT"){
+      
+      meanf_agg_method <- (Sagg %*% revisedMINT_bottom_idtest)
+      varf_agg_method  <- Vmint_agg
+      sd_agg_method    <- sqrt(varf_agg_method)
+      
+      samples_agg_method <- sapply(seq(n_agg), function(iagg){
+        qnorm(q_probs, meanf_agg_method[iagg], sd_agg_method[iagg])
+      })
+      
+    }else{
+      stop("error")
+    }
+    samples_agg[, , iagg_method] <- samples_agg_method
+    meanf_agg[, iagg_method] <- meanf_agg_method
+  }
+
+  #if(idjob %in% c(1, 2, 3, 4, 5)){
+  #  list_samples_agg[[idtest]] <- samples_agg
+  #}
+  
+ 
+   iagg <- 1
+   #library(lattice); library(latticeExtra)
+   dat <- data.frame(samples_agg[, iagg, c(1, 4, 9)]); 
+   #colnames(dat) <- c("a", "b", "c"); 
+   #ecdfplot(~ a+b+c, data=dat, col = c("black", "purple", "green") )
+  
+   #plot(ecdf(dat[, 2]), col = c("purple"))
+   #lines(ecdf(dat[, 1]), col = c("black"))
+   #lines(ecdf(dat[, 3]), col = c("green"))
+   #abline(v = obs_agg_idtest[iagg])
+   
+   
+   obs <- obs_agg_idtest[iagg]
+   res <- sapply(seq(3), function(i){crps_sampling(dat[, i], obs)})
+   print(res)
+   
+   if(FALSE){
+   sorted_dat <- apply(dat, 2, sort)
+   
+   res_all <- sapply(seq(3), function(i){
+     sapply(seq(length(q_probs)), function(iprob){
+       qf <- sorted_dat[iprob, i]
+       2 * ((obs <= qf) - q_probs[iprob]) * (qf - obs)
+      })
+    })
+   MAT2 <- rbind(MAT2, apply(res_all, 2, mean))
+   
+   }
+   
+   MAT <- rbind(MAT, res)
+   
+ 
+}# idtest

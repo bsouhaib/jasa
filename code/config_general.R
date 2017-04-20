@@ -31,6 +31,8 @@ m_1 <- 48
 m_2 <- 336
 
 #algo.agg <- "DYNREG"
+#algo.bottom <- "KD-IC-NML"
+
 algo.agg <- "DETS"
 algo.bottom <- "KD-IC-NML"
 

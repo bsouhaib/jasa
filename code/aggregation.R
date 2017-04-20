@@ -26,6 +26,10 @@ library(quadprog)
 
 set.seed(1986)
 
+computeParam <- function(m, v){
+  list(mulog = log(m/sqrt(1+(v/m^2))), sdlog = sqrt(log(1+(v/m^2))))
+}
+
 compute_crps <- function(methods, n, mat_samples, observations){
   res <- sapply(seq_along(methods), function(imethod){
     sapply(seq(n), function(i){
@@ -79,20 +83,29 @@ print(allidtest)
 load(file.path(work.folder, "myinfo.Rdata"))
 n_bottom <- length(bottomSeries)
 
-bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON", "PROBMINT")
-agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
-                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON", "NAIVEBU-MINT", "PROBMINT")
+#bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
+#agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
+#                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON")
 
-#bot_methods <- c("BASE", "BASE-MINT")
-#agg_methods <- c("BASE", "NAIVEBU", "PERMBU")
+#bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON", "MINTdiag", "MINTshrink")
+#agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
+#                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON", "NAIVEBU-MINT", "MINTdiag", "MINTshrink")
+
+bot_methods <- c("BASE", "BASE-MINT", "MINTdiag", "MINTshrink")
+agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "NAIVEBU-MINT", "MINTdiag", "MINTshrink")
+
 
 do.mint <- any(c(grepl("MINT", bot_methods), grepl("MINT", agg_methods)))
 do.myrevmean <- any(c(grepl("MCOMB", bot_methods), grepl("MCOMB", agg_methods)))
+do.mintvar <- any(c(grepl("MINTdiag", bot_methods), grepl("MINTdiag", agg_methods), grepl("MINTshrink", bot_methods), grepl("MINTshrink", agg_methods)))
 
 if(do.mint){
-  covmethod <- c("shrink")
-  W1file <- file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", covmethod, ".Rdata", sep = "")) 
-  load(W1file)
+  #load(file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", "shrink", ".Rdata", sep = "")))
+  #W1shrink <- W1
+  
+  #load(file.path(work.folder, "wmatrices", paste("W1_", algo.agg, "_", algo.bottom, "_", "diagonal", ".Rdata", sep = "")))
+  #W1diag <- W1
+  
   J <- Matrix(cbind(matrix(0, nrow = n_bottom, ncol = n_agg), diag(n_bottom)), sparse = TRUE)
   U <- Matrix(rbind(diag(n_agg), -t(Sagg)), sparse = TRUE)
 }
@@ -141,8 +154,15 @@ for(idtest in allidtest){
   #  print(base::date())
   #}
   
-  res_byidtest_file <- file.path(work.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
-  load(res_byidtest_file)
+  #if(algo.agg == "DYNREG" && algo.bottom == "KD-IC-NML"){
+  #  print("ONLY FOR ICML !!!")
+  #  res_byidtest_file <- file.path(work.folder, "byidtest/byidtest_ICML", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
+  #  load(res_byidtest_file)
+  #}else{
+    res_byidtest_file <- file.path(work.folder, "byidtest", paste("results_byidtest_", algo.agg, "_", algo.bottom, "_", idtest, ".Rdata", sep = "")) 
+    load(res_byidtest_file)
+  
+  #}
   # "QF_agg_idtest", "QF_bottom_idtest", "obs_agg_idtest", "obs_bottom_idtest", 
   # "revisedmean_bottom_idtest", 'revisedmean_agg_idtest', "mean_agg_idtest", "mean_bottom_idtest"
   
@@ -293,30 +313,58 @@ for(idtest in allidtest){
   if(do.mint){
     #print("MINT")
     
+    hwanted <- idtest%%48
+    if(hwanted == 0)
+      hwanted <- 48
+    
+    Whfile <- file.path(work.folder, "wmatrices", paste("W_", hwanted, "_", algo.agg, "_", algo.bottom, "_", "shrink", ".Rdata", sep = ""))
+    load(Whfile)
+    W1shrink <- W1
+    
+    Whfile <- file.path(work.folder, "wmatrices", paste("W_", hwanted, "_", algo.agg, "_", algo.bottom, "_", "diagonal", ".Rdata", sep = ""))
+    load(Whfile)
+    W1diag <- W1
+    
     #b_hat <- apply(base_samples_bottom, 2, mean)
     #a_hat <- apply(base_samples_agg, 2, mean)
     b_hat <- mean_bottom_idtest
     a_hat <- mean_agg_idtest 
       
     y_hat <- c(a_hat, b_hat)
-    adj_bottom_MINT <- mint_betastar(W1, y_hat = y_hat)
-    adj_agg_MINT    <- Sagg %*% adj_bottom_MINT
+    adj_bottom_MINTshrink <- as.numeric(mint_betastar(W1shrink, y_hat = y_hat))
+    adj_agg_MINTshrink     <- as.numeric(Sagg %*% adj_bottom_MINTshrink) 
+    revisedMINTshrink_bottom_idtest <- mean_bottom_idtest + adj_bottom_MINTshrink
     
-    adj_bottom_MINT <- as.numeric(adj_bottom_MINT)
-    adj_agg_MINT    <-  as.numeric(adj_agg_MINT)
+    adj_bottom_MINTdiag <- as.numeric(mint_betastar(W1diag, y_hat = y_hat))
+    revisedMINTdiag_bottom_idtest   <- mean_bottom_idtest + adj_bottom_MINTdiag
     
-    revisedMINT_bottom_idtest <- mean_bottom_idtest + adj_bottom_MINT
     #print("MINT done")
     #print(base::date())
     
     # MINT Variance
-    P_mint <- mint_pmatrix(W1)
-    S <- rbind(Sagg, diag(n_bottom))
-    V_mint <- S %*% P_mint %*% W1 %*% t(P_mint) %*% t(S)
-    
-    Vmint_agg <- diag(V_mint)[seq(n_agg)]
-    Vmint_bot <- diag(V_mint)[seq(n_agg + 1, n_total)]
+    if(do.mintvar){
+      S <- rbind(Sagg, diag(n_bottom))
+      #P_shrink <- mint_pmatrix(W1shrink)
+      #V_MINTshrink <- S %*% P_shrink %*% W1shrink %*% t(P_shrink) %*% t(S)
+      #V_MINTshrink_agg <- diag(V_MINTshrink)[seq(n_agg)]
+      #V_MINTshrink_bot <- diag(V_MINTshrink)[seq(n_agg + 1, n_total)]
       
+      myfct <- function(W){
+        P <- mint_pmatrix(W)
+        V <- S %*% P %*% W %*% t(P) %*% t(S)
+        V_agg <- diag(V)[seq(n_agg)]
+        V_bot <- diag(V)[seq(n_agg + 1, n_total)]
+        list(V_agg = V_agg, V_bot = V_bot)
+      }
+      res_shrink <- myfct(W1shrink)
+      V_MINTshrink_agg <- res_shrink$V_agg
+      V_MINTshrink_bot <- res_shrink$V_bot
+        
+      res_diag <- myfct(W1diag)
+      V_MINTdiag_agg <- res_diag$V_agg
+      V_MINTdiag_bot <- res_diag$V_bot
+      
+    }
     # a_tilde_test <- Sagg %*% P_mint %*% y_hat
     
     # stop("done")
@@ -380,28 +428,31 @@ for(idtest in allidtest){
       samples_bot_method <- base_samples_bottom
       meanf_bot_method <- mean_bottom_idtest
     }else if(bot_method == "BASE-MINT"){
-      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_MINT)
-      meanf_bot_method <- revisedMINT_bottom_idtest
+      samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_MINTshrink)
+      meanf_bot_method <- revisedMINTshrink_bottom_idtest
     }else if(bot_method == "BASE-MCOMB"){
       samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_mcomb)
       meanf_bot_method <- revisedmean_bottom_idtest
     }else if(bot_method == "BASE-MCOMBRECON"){
       samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_mcombrecon)
       meanf_bot_method <- rev_and_reconcilied_bottom_mean_idtest
-    }else if(bot_method == "PROBMINT"){
-      meanf_bot_method <- revisedMINT_bottom_idtest
+    }else if(bot_method == "MINTshrink" || bot_method == "MINTdiag"){
+      
+      if(bot_method == "MINTshrink"){
+        meanf_bot_method <- revisedMINTshrink_bottom_idtest
+        varf_bot_method  <- V_MINTshrink_bot
+      }else if(bot_method == "MINTdiag"){
+        meanf_bot_method <- revisedMINTdiag_bottom_idtest
+        varf_bot_method  <- V_MINTdiag_bot
+      }
       id_negative <- which(meanf_bot_method < 0)
       meanf_bot_method[id_negative] <- mean_bottom_idtest[id_negative]
-      varf_bot_method  <- Vmint_bot
       
       samples_bot_method <- sapply(seq(n_bottom), function(ibot){
         m <- meanf_bot_method[ibot]
         v <- varf_bot_method[ibot]
-        
-        mulog <- log(m/sqrt(1+(v/m^2)))
-        sdlog <- sqrt(log(1+(v/m^2)))
-        
-        qlnorm(q_probs, mulog, sdlog)
+        resparam <- computeParam(m, v)
+        qlnorm(q_probs, resparam$mulog, resparam$sdlog)
       })
       
     }else{
@@ -421,7 +472,7 @@ for(idtest in allidtest){
   
   # QS
   qscores_bottom <- compute_qscores(bot_methods, n_bottom, samples_bot, obs_bottom_idtest)
-  #sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
+  sum_overtest_qscores_bot <- sum_overtest_qscores_bot + qscores_bottom
   
   ######################## AGG
   samples_agg <- array(NA, c(M, n_agg, length(agg_methods)))
@@ -441,11 +492,11 @@ for(idtest in allidtest){
     #}else if(agg_method == "NAIVEBU-MINT"){
     #  samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU", agg_methods)]) + adj_agg_MINT)
     }else if(agg_method == "PERMBU-MINT"){
-      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_MINT)
-      meanf_agg_method <- (Sagg %*% revisedMINT_bottom_idtest)
+      samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_MINTshrink)
+      meanf_agg_method <- (Sagg %*% revisedMINTshrink_bottom_idtest)
     }else if(agg_method == "NAIVEBU-MINT"){
-      samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU" , agg_methods)]) + adj_agg_MINT)
-      meanf_agg_method <- (Sagg %*% revisedMINT_bottom_idtest)
+      samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU" , agg_methods)]) + adj_agg_MINTshrink)
+      meanf_agg_method <- (Sagg %*% revisedMINTshrink_bottom_idtest)
     }else if(agg_method == "PERMBU-MCOMB"){
       samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcomb)
       meanf_agg_method <- (Sagg %*% revisedmean_bottom_idtest)
@@ -455,16 +506,24 @@ for(idtest in allidtest){
     }else if(agg_method == "PERMBU-MCOMBUNRECON"){
       samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcombunrecon)
       meanf_agg_method <- revisedmean_agg_idtest
-    }else if(agg_method == "PROBMINT"){
+    }else if(agg_method == "MINTdiag" || agg_method == "MINTshrink"){
       
-      meanf_agg_method <- (Sagg %*% revisedMINT_bottom_idtest)
-      varf_agg_method  <- Vmint_agg
+      if(agg_method == "MINTshrink"){
+        meanf_agg_method <- (Sagg %*% revisedMINTshrink_bottom_idtest)
+        varf_agg_method  <- V_MINTshrink_agg
+        
+      }else if(agg_method == "MINTdiag"){
+        meanf_agg_method <- (Sagg %*% revisedMINTdiag_bottom_idtest)
+        varf_agg_method  <- V_MINTdiag_agg
+      }    
       sd_agg_method    <- sqrt(varf_agg_method)
       
       samples_agg_method <- sapply(seq(n_agg), function(iagg){
-        qnorm(q_probs, meanf_agg_method[iagg], sd_agg_method[iagg])
+        resparam <- computeParam(meanf_agg_method[iagg], varf_agg_method[iagg])
+        qlnorm(q_probs, resparam$mulog, resparam$sdlog)
+        #qnorm(q_probs, meanf_agg_method[iagg], sd_agg_method[iagg])
       })
-      
+
     }else{
       stop("error")
     }
@@ -476,6 +535,21 @@ for(idtest in allidtest){
   #  list_samples_agg[[idtest]] <- samples_agg
   #}
   
+  #stop("done")
+  if(FALSE){
+   iagg <- 1
+   library(lattice); library(latticeExtra)
+   dat <- data.frame(samples_agg[, iagg, c(1, 4, 9)]); colnames(dat) <- c("a", "b", "c"); 
+   #ecdfplot(~ a+b+c, data=dat, col = c("black", "purple", "green") )
+  
+   plot(ecdf(dat[, 2]), col = c("purple"))
+   lines(ecdf(dat[, 1]), col = c("black"))
+   lines(ecdf(dat[, 3]), col = c("green"))
+   abline(v = obs_agg_idtest[iagg])
+   
+   sapply(seq(3), function(i){crps_sampling(dat[, i], obs_agg_idtest[iagg])})
+  }
+  
   # MSE
   mse_matrix_agg    <- (meanf_agg - obs_agg_idtest)^2
   list_mse_agg[[idtest]] <- mse_matrix_agg
@@ -486,14 +560,15 @@ for(idtest in allidtest){
   
   # QS
   qscores_agg <- compute_qscores(agg_methods, n_agg, samples_agg, obs_agg_idtest)
-  #sum_overtest_qscores_agg <- sum_overtest_qscores_agg + qscores_agg
+  sum_overtest_qscores_agg <- sum_overtest_qscores_agg + qscores_agg
   
   weights_uniform <- 1
-  weights_center  <- q_probs * (1 - q_probs)
+  #weights_center  <- q_probs * (1 - q_probs)
+  weights_tails_bis <- (2 * q_probs - 1)^4
   weights_tails   <- (2 * q_probs - 1)^2
   weights_rtail   <- q_probs^2
   weights_ltail   <- (1 - q_probs)^2
-  weights_matrix <- rbind(weights_uniform, weights_center, weights_tails, weights_rtail, weights_ltail)
+  weights_matrix <- rbind(weights_uniform, weights_tails_bis, weights_tails, weights_rtail, weights_ltail)
   
   aggmethods_wcrps <- sapply(seq(n_agg), function(iagg){
     sapply(seq_along(agg_methods), function(imethod){
@@ -519,13 +594,13 @@ for(idtest in allidtest){
   assign("last.warning", NULL, envir = baseenv())
 }# idtest
 
-#avg_qscores_agg <- sum_overtest_qscores_agg/length(allidtest)
-#avg_qscores_bot <- sum_overtest_qscores_bot/length(allidtest)
+avg_qscores_agg <- sum_overtest_qscores_agg/length(allidtest)
+avg_qscores_bot <- sum_overtest_qscores_bot/length(allidtest)
 
 res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
 #save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg", "avg_qscores_bot"))
 #save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "avg_qscores_agg", "list_mse_bot", "list_mse_agg", "list_wcrps_agg"))
-save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "list_mse_bot", "list_mse_agg", "list_wcrps_agg", "list_wcrps_bot"))
+save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "list_mse_bot", "list_mse_agg", "list_wcrps_agg", "list_wcrps_bot", "avg_qscores_agg", "avg_qscores_bot"))
 
 
 if(FALSE){

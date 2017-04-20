@@ -65,13 +65,62 @@ for(i in set_ids){
 }
 endpdf()
 
-savepdf(file.path(results.folder, paste("cycle_agg", sep = "")), height = 27 * 0.25, width = 21)
 
-for(iagg in node_order){
-  x <- MAT[which(Sagg[iagg, ] == 1), , ]
-  v <- apply(x, c(2, 3), mean)
-  matplot(v, type = 'l', lty = 1, xlab = "", ylab = "Electricity demand (scaled)")
+####
+MAT_bottom <- array(NA, c(n_bottom, 48, 7)) 
+MAT_agg <- array(NA, c(n_agg, 48, 7)) 
+#matrix(NA, nrow = n_bottom, ncol = 48)
+
+for(iseries in seq(n_bottom)){
+  idseries <- bottomSeries[iseries]
+  load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
+  demand_day <- matrix(demand, ncol = 48, byrow = T)
+  
+  res <- sapply(dweeks, function(dweek){
+    apply(demand_day[which(day_dweek == dweek), ], 2, mean)
+  })
+  MAT_bottom[iseries, , ] <- res
 }
-endpdf()
+for(iseries in seq(n_agg)){
+  idseries <- aggSeries[iseries]
+  load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
+  demand_day <- matrix(demand, ncol = 48, byrow = T)
+  
+  res <- sapply(dweeks, function(dweek){
+    apply(demand_day[which(day_dweek == dweek), ], 2, mean)
+  })
+  MAT_agg[iseries, , ] <- res
+}
+
+#pdf(file.path(results.folder, paste("IC.pdf", sep = "")), width = 21 * 0.9, height = 27 * 0.5)
+#par(mfrow = c(2, 3))
+
+pdf(file.path(results.folder, paste("IC.pdf", sep = "")))
+par(mfrow = c(3, 2))
+
+# id <- node_order
+id <- c(1, 4, 7, 39, 52)
+
+my_cex <- .7
+my_pch <- c(3, 4, 5, 6, 7, 1, 2)
+for(iagg in node_order[id]){
+  ind <- which(Sagg[iagg, ] == 1)
+  v <- MAT_agg[iagg, , ]
+  #v <- apply(x, c(2, 3), mean)
+  # matplot(v, type = 'l', lty = my_lty, ylab = "Electricity demand", main = length(ind), xaxt = "n", xlab = "Time of Day", col = "black")
+  matplot(v, ylab = "Electricity demand (scaled)", main = length(ind), xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
+  matpoints(v, pch = my_pch, col = "black", cex = my_cex)
+  axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8))
+  if(iagg == 1){
+    legend("topleft", abbr.dweek[c(6, 7, 1, 2, 3, 4, 5)], pch = my_pch[c(6, 7, 1, 2, 3, 4, 5)], lty = 1, cex = my_cex, bty = "n")
+  }
+}
+
+#matplot(MAT[50, , ], type = 'l', lty = my_lty, ylab = "Electricity demand (scaled)", main = 1, xaxt = "n", xlab = "Time of Day", col = "black")
+matplot(MAT_bottom[50, , ], ylab = "Electricity demand", main = 1, xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
+matpoints(MAT_bottom[50, , ], pch = my_pch, col = "black", cex = my_cex)
+axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8))
+
+dev.off()
 
 
