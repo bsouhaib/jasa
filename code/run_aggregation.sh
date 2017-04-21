@@ -22,7 +22,7 @@ njobs=12
 nperjobs=368
 
 allijobs=$(seq 1 $njobs )
-allijobs=(3 5)
+allijobs=(7)
 
 for ijob in ${allijobs[@]}
 do
