@@ -1,28 +1,44 @@
 # color.bot <- c("black", "purple", "red", "green")
 # color.agg <- c("black", "orange", "cyan", "purple", "pink", "red", "green")
-
 #pch.bot <- c(21, 21, 23, 23)
 #pch.agg <- c(21, 21, 22, 21, 22, 23, 23)
 
 do.avg <- TRUE
 if(do.avg){
-  par(mfrow = c(1, 4))
+  par(mfrow = c(1, 5))
 }
 
 node_nbkids <- apply(Sagg, 1, sum)
+
+if(FALSE){
+  do.agg <- T
+  nseries <- ifelse(do.agg, n_agg, n_bottom)
+  x <- numeric(nseries)
+  for(iseries in seq(nseries)){
+    if(do.agg){
+      idseries <- aggSeries[iseries]
+      load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
+    }else{
+      idseries <- bottomSeries[iseries]
+      load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
+    }
+    x[iseries] <- mean(demand)
+  }
+  node_nbkids <- x
+}
+
 node_order <- sort(node_nbkids, index = T, decreasing = T)$ix
 
 lty.bot <- c(1, 2, 6, 5)
 lty.agg <- c(1, 3, 2, 2, 3, 6, 5)
 
-my_ylab <- ""
 measures <- c("CRPS", "CRPS Tails", "CRPS Left tail", "CRPS Right tail", "MSE", "QS")
 myfct <- "mean"
 #myfct <- "median"
 
 #x <- c(1, 3, 5, 39, 7)
 x <- c(1, 8, 39, 7)
-#x <- rep(1, 55)
+x <- c(rep(1, 6), 13, 17, 19)
 
 stopifnot(sum(x) == n_agg)
 z <- cumsum(x)
@@ -74,7 +90,7 @@ for(measure in measures){
       }, simplify = "array")
       mat_bot <- aperm(mat_bot, c(1, 3, 2))
     }
-  }
+  }# FALSE
   
   mat_agg_skill <- sapply(seq_along(agg_methods), function(iaggmethod){
     (mat_agg[, match("BASE", agg_methods), ] - mat_agg[, iaggmethod, ])/mat_agg[, match("BASE", agg_methods), ]
@@ -91,32 +107,40 @@ for(measure in measures){
   if(do.avg){
     
     idwanted <- c(1, 4, 5, 6, 7)
+    #idwanted <- 1:7
     
     MAT <- mat_agg_skill
     res <- t(apply(MAT, c(2, 3), mean))
-    matplot(x = log(node_nbkids), res[, idwanted], type = "p", pch = 22, cex = .8, main = measure, col = color.agg[idwanted])
-    #res <- sapply(seq(ncol(res)), function(icol){lowess(x = rev(log(node_nbkids)),y =  res[, icol], f = 1/8)$y})
-    #matlines(x = log(node_nbkids), res)
     
-    #newx <- c(1, 8, 39, 7) 
-    #newx <- c(rep(1, 20), 20, 10, 5)
-    newx <- c(rep(1, 6), 8, 5, 7, 10, 9, 5, 5)
-    stopifnot(sum(newx) == n_agg)
-    newz <- cumsum(newx)
-    
-    newres <- xres <- NULL
-    newz <- 
-    for(i in seq_along(newz)){
-      
-      if(i == 1){
-        interval <- seq(1, newz[i])
-      }else{
-        interval <- seq(newz[i - 1] + 1, newz[i])
-      }
-    newres <- rbind(newres, apply(res[node_order[interval], idwanted, drop = F], 2, mean) )
-    xres <- c(xres, log(mean(node_nbkids[node_order[interval]])) )
+    if(FALSE){
+      matplot(x = log(node_nbkids), res[, idwanted], type = "p", pch = 22, cex = .8, main = measure, col = color.agg[idwanted])
+      #res <- sapply(seq(ncol(res)), function(icol){lowess(x = rev(log(node_nbkids)),y =  res[, icol], f = 1/8)$y})
+      #matlines(x = log(node_nbkids), res)
     }
-    matplot(x = xres, newres, type = 'o', pch = 21,  lty = 1, main = measure, col = color.agg[idwanted])
+    
+    if(measure != "QS"){
+      #newx <- c(1, 8, 39, 7) 
+      #newx <- c(rep(1, 20), 20, 10, 5)
+      newx <- c(rep(1, 6), 8, 5, 7, 10, 9, 5, 5)
+      stopifnot(sum(newx) == n_agg)
+      newz <- cumsum(newx)
+      
+      newres <- xres <- bisxres <- NULL
+      newz <- 
+      for(i in seq_along(newz)){
+        
+        if(i == 1){
+          interval <- seq(1, newz[i])
+        }else{
+          interval <- seq(newz[i - 1] + 1, newz[i])
+        }
+      newres <- rbind(newres, apply(res[node_order[interval], idwanted, drop = F], 2, mean) )
+      xres <- c(xres, log(mean(node_nbkids[node_order[interval]])) )
+      bisxres <- c(bisxres, mean(node_nbkids[node_order[interval]]))
+      }
+      matplot(x = xres, newres, type = 'o', pch = 21,  lty = 1, main = measure, col = color.agg[idwanted])
+      #matplot(x = bisxres, newres, type = 'o', pch = 21,  lty = 1, main = measure, col = color.agg[idwanted])
+    }
   }else{
 
     list_agg_imethods <- list_bot_imethods  <- vector("list", 2)
@@ -212,7 +236,7 @@ for(measure in measures){
               #	ylab = my_ylab, xlab = "Horizon", ylim = my_range)
               
               matplot(mat, type = 'l', lty = lty.agg[agg_imethods], col = "black", 
-                      ylab = my_ylab, xlab = "Horizon", main = my_main, ylim = my_range)
+                      ylab = "", xlab = "Horizon", main = my_main, ylim = my_range)
               
             }
           }

@@ -72,6 +72,11 @@ color.bot <- c("black", "purple", "red", "green")
 agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "NAIVEBU-MINT", "MINTdiag", "MINTshrink")
 color.agg <- c("black", "orange", "cyan", "purple", "pink", "red", "green")
 
+pch.agg <- c(8, 0, 2, 2, 0, 1, 3) 
+pch.bot <- c(8, 2, 1, 3)
+lty.agg <- c(1, 3, 2, 2, 3, 6, 5)
+lty.bot <- c(1, 2, 6, 5)
+
 if(FALSE){
 bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON", "PROBMINT")
 color.bot <- c("black", "purple", "darkgreen", "darkblue", "green")
@@ -247,6 +252,13 @@ wcrps_bot_byhour <- sapply(seq(5), function(iweight){
 }, simplify = 'array')
 
 wcrps_bot_byhour <- aperm(wcrps_bot_byhour, c(4, 1, 2, 3))
+
+
+#res_info <- getInfoNode("nb_nodes")
+res_info <- getInfoNode("kwh")
+agg_nodes_order <- sort(res_info$info_nodes_agg, index = T, decreasing = T)$ix
+bot_nodes_order <- sort(res_info$info_nodes_bottom, index = T, decreasing = T)$ix
+
 
 stop("done")
 
