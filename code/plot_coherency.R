@@ -11,13 +11,14 @@ library(ggplot2)
 
 nhours <- 48
 
-gplot_matrix <- function(X, my_title){
+gplot_matrix <- function(X, my_title = ""){
   nbrow <- nrow(X)
   Z <- melt(t(X))
   Zp <- Z
   Zp$Var2 <- nbrow + 1 - Zp$Var2
   
-  mybreaks <- seq(1, nhours, by = 6) 
+  #mybreaks <- seq(1, nhours, by = 6) 
+  mybreaks <- c(1, seq(8, nhours, by = 8)) 
   #mybreaks <- c(1, seq(33, nhours, by = 48))
   mylabels <- rep(tday, nhours/48)[mybreaks]
   
@@ -27,7 +28,7 @@ gplot_matrix <- function(X, my_title){
     #scale_fill_gradient2(name = expression(log(abs(tilde(epsilon)))), low="white", high="black", guide="colorbar")+
     scale_x_continuous(breaks = mybreaks, labels = mylabels) +
     xlab("Hour of the day") + 
-    ylab("ID of aggregate series") +
+    ylab("Aggregate series") +
     theme_bw() +
     ggtitle(my_title)
   
@@ -39,6 +40,9 @@ gplot_matrix <- function(X, my_title){
 load(file.path(work.folder, "myinfo.Rdata"))
 
 rank <- sort(apply(Sagg, 1, sum), index = T, decreasing = T)$ix
+
+node_nbkids <- apply(Sagg, 1, sum)
+node_order <- sort(node_nbkids, index = T, decreasing = T)$ix
 
 algo.agg <- "DETS"
 algo.bottom <- "KD-IC-NML"
@@ -62,7 +66,7 @@ for(idtest in seq(4416)){
   meanf[seq(1, n_agg), idtest] <- mean_agg_idtest
   meanf[seq(n_agg + 1, n_agg + n_bottom), idtest] <- mean_bottom_idtest
   
-  #if(idtest <= 48){
+  if(FALSE){
     base_samples_agg <- matrix(NA, nrow = M, ncol = n_agg)
     base_samples_bottom <- matrix(NA, nrow = M, ncol = n_bottom)
     
@@ -93,7 +97,7 @@ for(idtest in seq(4416)){
     #prob_coherency_50[, idtest] <- res[which.min(abs(q_probs - 0.5)), ]
     #prob_coherency_90[, idtest] <- res[which.min(abs(q_probs - 0.9)), ]
     
-  #}
+  }
   
 }
 
@@ -147,29 +151,48 @@ for(p in seq(8)){
 }
 multiplot(listp[[1]], listp[[2]], listp[[3]], listp[[4]], listp[[5]], listp[[6]] , listp[[7]], listp[[8]], cols=3)
 
+#####
 savepdf(file.path(results.folder, paste("prob-coherency", sep = "") ))
 print(listp[[8]])
 endpdf()
+#####
 
-r <- meanf[seq(1, n_agg), ] - Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ]
-r <- r[rank, ]
+do.relative <- FALSE
+#####
+if(do.relative){
+  r <- (meanf[seq(1, n_agg), ] - Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ])/meanf[seq(1, n_agg), ]
+  r <- (meanf[seq(1, n_agg), ] - Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ])/Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ]
+}else{
+  r <- meanf[seq(1, n_agg), ] - Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ]
+}
+
+#r <- r[rank, ]
+r <- r[node_order, ]
 
 
-X <- log(abs(r[, seq(48)]))
+#X <- log(abs(r[, seq(48)]))
 
 v <- sapply(seq(n_agg), function(iagg){
   #log(abs(matrix(r[iagg, ], ncol = 48, byrow = T)))
-  abs(matrix(r[iagg, ], ncol = 48, byrow = T))
+  #abs(matrix(r[iagg, ], ncol = 48, byrow = T))
+  matrix(r[iagg, ], ncol = 48, byrow = T)
 }, simplify = "array")
 v <- aperm(v, c(1, 3, 2))
 
 X <- apply(v, c(2, 3), mean)
 
-X <- log(X)
+
+if(do.relative){
+  #X <- abs(X)
+}else{
+  X <- log(abs(X))
+}
+
 
 savepdf(file.path(results.folder, paste("mean-coherency", sep = "") ))
 print(gplot_matrix(X))
 endpdf()
+#####
 
 
 p1 <- gplot_matrix(log(prob_coherency[rank, ]))
@@ -177,4 +200,6 @@ p2 <- gplot_matrix(log(prob_coherency_10[rank, ]))
 p3 <- gplot_matrix(log(prob_coherency_50[rank, ]))
 p4 <- gplot_matrix(log(prob_coherency_90[rank, ]))
 multiplot(p1, p2, p3, p4, cols=2)
+
+
 

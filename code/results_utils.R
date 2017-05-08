@@ -1,33 +1,4 @@
 
-getInfoNode <- function(typeinfo)
-{
-  if(typeinfo == "nb_nodes"){
-    info_nodes_agg <- apply(Sagg, 1, sum)
-    info_nodes_bottom <- rep(1, n_bottom)
-  }else if(typeinfo == "kwh"){
-    for(do.agg in c(TRUE, FALSE)){
-      nseries <- ifelse(do.agg, n_agg, n_bottom)
-      x <- numeric(nseries)
-      for(iseries in seq(nseries)){
-        if(do.agg){
-          idseries <- aggSeries[iseries]
-          load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
-        }else{
-          idseries <- bottomSeries[iseries]
-          load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
-        }
-        #x[iseries] <- mean(demand)
-        x[iseries] <- mean(apply(matrix(demand, nrow = 2), 2, sum))
-      }
-      if(do.agg){
-        info_nodes_agg <- x
-      }else{
-        info_nodes_bottom <- x
-      }
-    }
-  }
-  list(info_nodes_agg = info_nodes_agg, info_nodes_bottom = info_nodes_bottom)
-}
 
 
 get_mat <- function(measure, do.skill){
@@ -62,6 +33,7 @@ get_mat <- function(measure, do.skill){
       (res_bot[, match("BASE", bot_methods), ] - res_bot[, ibotgmethod, ])/res_bot[, match("BASE", bot_methods), ]
     }, simplify = 'array')
     
+    #browser()
     res_agg <- aperm(mat_agg_skill, c(1, 3, 2))
     res_bot <- aperm(mat_bot_skill, c(1, 3, 2))
   }
@@ -80,3 +52,4 @@ to_aggname <- function(algo){
   } 
   res
 }
+

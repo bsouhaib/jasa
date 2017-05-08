@@ -2,6 +2,36 @@
 #  2 * sqrt(varx) * dnorm(mux / sqrt(varx)) + mux * (2 * pnorm(mux / sqrt(varx)) - 1)
 #}
 
+getInfoNode <- function(typeinfo)
+{
+  if(typeinfo == "nb_nodes"){
+    info_nodes_agg <- apply(Sagg, 1, sum)
+    info_nodes_bottom <- rep(1, n_bottom)
+  }else if(typeinfo == "kwh"){
+    for(do.agg in c(TRUE, FALSE)){
+      nseries <- ifelse(do.agg, n_agg, n_bottom)
+      x <- numeric(nseries)
+      for(iseries in seq(nseries)){
+        if(do.agg){
+          idseries <- aggSeries[iseries]
+          load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
+        }else{
+          idseries <- bottomSeries[iseries]
+          load(file.path(mymeters.folder, paste("mymeter-", idseries, ".Rdata", sep = "")))
+        }
+        #x[iseries] <- mean(demand)
+        x[iseries] <- mean(apply(matrix(demand, nrow = 2), 2, sum))
+      }
+      if(do.agg){
+        info_nodes_agg <- x
+      }else{
+        info_nodes_bottom <- x
+      }
+    }
+  }
+  list(info_nodes_agg = info_nodes_agg, info_nodes_bottom = info_nodes_bottom)
+}
+
 iterate <- function(theta, y, e_0, l_0, d_0, w_0, do.forecast = FALSE){
   phi   <- theta[1]
   alpha <- theta[2]

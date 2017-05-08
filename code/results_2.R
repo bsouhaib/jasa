@@ -1,15 +1,12 @@
 source("results_utils.R")
 
+myfct <- "mean"
+
 #measures <- c("CRPS", "CRPS Tails", "CRPS Left tail", "CRPS Right tail", "MSE", "QS")
 #measures <- c("CRPS", "MSE", "QS")
 measures <- c("CRPS Tails", "MSE", "QS")
 
-list_agg_imethods <- list_bot_imethods  <- vector("list", 2)
-list_agg_imethods[[1]] <- match(c("BASE", "NAIVEBU","PERMBU"), agg_methods)
-list_bot_imethods[[1]] <- match(c("BASE"), bot_methods) 
 
-list_agg_imethods[[2]] <- match(c("BASE", "NAIVEBU-MINT", "PERMBU-MINT", "MINTshrink"), agg_methods)
-list_bot_imethods[[2]] <- match(c("BASE", "BASE-MINT", "MINTshrink"), bot_methods)
 
 #x <- c(rep(1, 6), 13, 17, 19)
 x <- c(rep(1, 4), 15, 17, 19)
@@ -22,19 +19,40 @@ d <- length(z) + 1
 
 for(measure in measures){
   
+  list_agg_imethods <- list_bot_imethods  <- vector("list", 2)
+  if(measure == "MSE"){
+    list_agg_imethods[[1]] <- match(c("BASE", "NAIVEBU"), agg_methods)
+    list_bot_imethods[[1]] <- match(c("BASE"), bot_methods)
+    
+    list_agg_imethods[[2]] <- match(c("BASE", "MINTdiag", "MINTshrink"), agg_methods)
+    list_bot_imethods[[2]] <- match(c("BASE", "MINTdiag", "MINTshrink"), bot_methods)
+  }else{
+    list_agg_imethods[[1]] <- match(c("BASE", "NAIVEBU","PERMBU"), agg_methods)
+    list_bot_imethods[[1]] <- match(c("BASE"), bot_methods) 
+    
+    list_agg_imethods[[2]] <- match(c("BASE", "NAIVEBU-MINT", "PERMBU-MINT", "MINTshrink"), agg_methods)
+    list_bot_imethods[[2]] <- match(c("BASE", "BASE-MINT", "MINTshrink"), bot_methods)
+  }
+  
   #savepdf(file.path(results.folder, paste("RESULTS_2", "_", measure, sep = "")), height = 27 * 0.5, width = 27)
   
   for(myrow in c(1, 2)){
-    savepdf(file.path(results.folder, paste("RESULTS_2", "_", measure, "_", myrow, sep = "")))
-    par(mfrow = c(2, 4))
+    savepdf(file.path(results.folder, paste("RESULTS_2", "_", measure, "_", myrow, sep = "")), height = 27 * 0.5)
+    if(measure == "MSE"){
+      par(mfrow = c(3, 3))
+    }else{
+      par(mfrow = c(2, 4))
+    }
     
     if(myrow == 1){
       do.relative <- F
     }else{
       #do.relative <- ifelse(measure == "QS", FALSE, TRUE)
       do.relative <- TRUE
-      
     }
+    
+    my_ylab <- ifelse(do.relative, paste(measure, " skill", sep = ""), measure)
+    
     list_mat <- get_mat(measure, do.skill = do.relative)
     res_agg <- list_mat$res_agg
     res_bot <- list_mat$res_bot
@@ -87,7 +105,7 @@ for(measure in measures){
           #matplot(avg_bot, type = 'l', lty = lty.bot[bot_imethods], 
           #        ylab = "", xlab= "Horizon", ylim = my_range, col = "black", main = paste("1 - (", n_bottom, ")", sep = ""))
           
-          matplot(avg_bot, type = 'o', ylab = measure, xlab=  "Hour of the day", ylim = my_range, 
+          matplot(avg_bot, type = 'o', ylab = my_ylab, xlab=  "Hour of the day", ylim = my_range, 
                   col = "black", main = my_main,
                   pch = pch.bot[bot_imethods], cex = .5, lty = 1, xaxt = "n")
           
@@ -121,8 +139,8 @@ for(measure in measures){
         if(measure != "QS"){
           
           # smoothing
-          res <- sapply(seq(ncol(mat)), function(icol){lowess(mat[, icol], f = 1/6)$y})
-          mat <- res
+          #res <- sapply(seq(ncol(mat)), function(icol){lowess(mat[, icol], f = 1/6)$y})
+          #mat <- res
           
            #Averaging to obtain 24 hours 
            res <- sapply(seq(ncol(mat)), function(icol){
@@ -144,11 +162,11 @@ for(measure in measures){
         
         
         if(step == 2){
-          my_main <- ""
-          if(exists("iweight") && iweight == 1){
+            my_main <- ""
+          #if(exists("iweight") && iweight == 1){
             x <- mean(res_info$info_nodes_agg[agg_nodes_order[interval]])
             my_main <- paste(format(x, digits = 3), " - ", "(", length(interval), ")", sep = "")
-          }
+          #}
           
           #matplot(mat, type = 'l', col = color.agg[agg_imethods], lty = 1, main = my_main, 
           #    ylab = my_ylab, xlab = "Horizon", ylim = my_range)
@@ -172,7 +190,7 @@ for(measure in measures){
             
             matplot(mat, 
                     type = 'o', lty = 1, col = "black",
-                    ylab = measure, xlab = "Hour of the day", main = my_main, ylim = my_range, pch = pch.agg[agg_imethods], cex = .5,
+                    ylab = my_ylab, xlab = "Hour of the day", main = my_main, ylim = my_range, pch = pch.agg[agg_imethods], cex = .5,
                     xaxt = "n")
             
             tday_hourly <- tday[seq(1, 48, 2)]

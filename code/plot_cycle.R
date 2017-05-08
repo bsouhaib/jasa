@@ -12,6 +12,7 @@ node_order <- sort(node_nbkids, index = T, decreasing = T)$ix
 day_dweek <- matrix(calendar$dweek, ncol = 48, byrow = T)[, 1]
 dweeks <- unique(day_dweek)
 
+if(FALSE){
 # all meters
 savepdf(file.path(results.folder, paste("cycle_all_meters", sep = "")))
 par(mfrow = c(2, 2))
@@ -64,6 +65,7 @@ for(i in set_ids){
   matplot(res, type = 'l', lty = 1, ylab = "Electricity demand (scaled)")
 }
 endpdf()
+}
 
 
 ####
@@ -95,11 +97,21 @@ for(iseries in seq(n_agg)){
 #pdf(file.path(results.folder, paste("IC.pdf", sep = "")), width = 21 * 0.9, height = 27 * 0.5)
 #par(mfrow = c(2, 3))
 
-pdf(file.path(results.folder, paste("IC.pdf", sep = "")))
-par(mfrow = c(3, 2))
+do.slides <- TRUE
+if(do.slides){
+  savepdf(file.path(results.folder, paste("ICslides", sep = "")))
+  par(mfrow = c(2, 3))
+}else{
+  savepdf(file.path(results.folder, paste("IC", sep = "")), height = 27 * 0.5)
+  par(mfrow = c(3, 2))
+}
+
+
+itday <- c(1, seq(8, 48, by = 8))
 
 # id <- node_order
-id <- c(1, 4, 7, 39, 52)
+#id <- c(1, 4, 7, 39, 52)
+id <- c(1, 7, 39, 50)
 
 my_cex <- .7
 my_pch <- c(3, 4, 5, 6, 7, 1, 2)
@@ -108,9 +120,10 @@ for(iagg in node_order[id]){
   v <- MAT_agg[iagg, , ]
   #v <- apply(x, c(2, 3), mean)
   # matplot(v, type = 'l', lty = my_lty, ylab = "Electricity demand", main = length(ind), xaxt = "n", xlab = "Time of Day", col = "black")
-  matplot(v, ylab = "Electricity demand (scaled)", main = length(ind), xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
+  matplot(v, ylab = "Consumption (kWh)", main = length(ind), xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
   matpoints(v, pch = my_pch, col = "black", cex = my_cex)
-  axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8))
+  #axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8))
+  axis(1, labels = tday[itday], at = itday)
   if(iagg == 1){
     legend("topleft", abbr.dweek[c(6, 7, 1, 2, 3, 4, 5)], pch = my_pch[c(6, 7, 1, 2, 3, 4, 5)], lty = 1, cex = my_cex, bty = "n")
   }
@@ -119,7 +132,8 @@ for(iagg in node_order[id]){
 #matplot(MAT[50, , ], type = 'l', lty = my_lty, ylab = "Electricity demand (scaled)", main = 1, xaxt = "n", xlab = "Time of Day", col = "black")
 matplot(MAT_bottom[50, , ], ylab = "Electricity demand", main = 1, xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
 matpoints(MAT_bottom[50, , ], pch = my_pch, col = "black", cex = my_cex)
-axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8))
+axis(1, labels = tday[itday], at = itday)
+#axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8))
 
 dev.off()
 

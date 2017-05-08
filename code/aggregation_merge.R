@@ -254,8 +254,8 @@ wcrps_bot_byhour <- sapply(seq(5), function(iweight){
 wcrps_bot_byhour <- aperm(wcrps_bot_byhour, c(4, 1, 2, 3))
 
 
-#res_info <- getInfoNode("nb_nodes")
-res_info <- getInfoNode("kwh")
+res_info <- getInfoNode("nb_nodes")
+#res_info <- getInfoNode("kwh")
 agg_nodes_order <- sort(res_info$info_nodes_agg, index = T, decreasing = T)$ix
 bot_nodes_order <- sort(res_info$info_nodes_bottom, index = T, decreasing = T)$ix
 
