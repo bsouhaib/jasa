@@ -18,8 +18,11 @@ load(file.path(work.folder, "myinfo.Rdata"))
 node_nbkids <- apply(Sagg, 1, sum)
 node_order <- sort(node_nbkids, index = T, decreasing = T)$ix
 
+offset <- 48 * 7 * 4
+
 #nb_points <- 48 * 7 * 3
 nb_points <- 48 * 7 * 2
+nb_points <- 48 * 7 
 
 alldemand <- NULL
 #res_sort <- sort(apply(Sagg, 1, sum), index = T, decreasing = T)
@@ -28,7 +31,7 @@ alldemand <- NULL
 for(iseries in node_order){
     idseries <- aggSeries[iseries]
     load(file.path(aggseries.folder, paste("series-", idseries, ".Rdata", sep = "")))
-  alldemand <- cbind(alldemand, demand[seq(nb_points)])
+  alldemand <- cbind(alldemand, demand[offset + seq(nb_points)])
 }
 #id <- seq(1, 55, by = 10)
 #id <- c(1, 4, 7, 39, 52)
@@ -51,10 +54,11 @@ colnames(alldemand) <- c(node_nbkids[node_order[id]], 1)
 #axis(1, labels=time, at=seq(from=2010, by=0.25, length.out=length(time)) )
 
 
-savepdf(file.path(results.folder, "JASA-METERS2"))
+savepdf(file.path(results.folder, "demand-bylevel"))
 my.ts.panel <- function(x, col = col, bg = bg, pch = pch, type = type,  vpos=48*7, ...){
   lines(x, col = col, bg = bg, pch = pch, type = type, ...)
-  abline(v=vpos)}
-plot.ts(alldemand, panel=my.ts.panel,  nc = 1, axes = F, xlab = "Half-hour", xaxt = "n")
+  #abline(v=vpos)
+  }
+plot.ts(alldemand, panel=my.ts.panel,  nc = 1, axes = F, xlab = "Half-hour", xaxt = "n", main = "")
 endpdf()
 # main = paste(node_nbkids[node_order[id]], " aggregated meters", sep = ""), 

@@ -70,7 +70,7 @@ bot_methods <- c("BASE", "BASE-MINT", "MINTdiag", "MINTshrink")
 color.bot <- c("black", "purple", "red", "green")
 
 agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "NAIVEBU-MINT", "MINTdiag", "MINTshrink")
-color.agg <- c("black", "orange", "cyan", "purple", "pink", "red", "green")
+color.agg <- c("black", "orange", "purple", "cyan", "pink", "red", "green")
 
 pch.agg <- c(8, 0, 2, 2, 0, 1, 3) 
 pch.bot <- c(8, 2, 1, 3)

@@ -84,15 +84,15 @@ load(file.path(work.folder, "myinfo.Rdata"))
 n_bottom <- length(bottomSeries)
 
 #bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
-#agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
+#agg_methods <- c("BASE", "INDEPBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
 #                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON")
 
 #bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON", "MINTdiag", "MINTshrink")
-#agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
-#                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON", "NAIVEBU-MINT", "MINTdiag", "MINTshrink")
+#agg_methods <- c("BASE", "INDEPBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
+#                 "PERMBU-MCOMBRECON", "PERMBU-MCOMBUNRECON", "INDEPBU-MINT", "MINTdiag", "MINTshrink")
 
-bot_methods <- c("BASE", "BASE-MINT", "MINTdiag", "MINTshrink")
-agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "NAIVEBU-MINT", "MINTdiag", "MINTshrink")
+bot_methods <- c("BASE", "BASE-MINTshrink", "MINTdiag", "MINTshrink")
+agg_methods <- c("BASE", "INDEPBU", "PERMBU", "PERMBU-MINTshrink", "INDEPBU-MINTshrink", "MINTdiag", "MINTshrink")
 
 
 do.mint <- any(c(grepl("MINT", bot_methods), grepl("MINT", agg_methods)))
@@ -338,6 +338,7 @@ for(idtest in allidtest){
     adj_bottom_MINTdiag <- as.numeric(mint_betastar(W1diag, y_hat = y_hat))
     revisedMINTdiag_bottom_idtest   <- mean_bottom_idtest + adj_bottom_MINTdiag
     
+    #browser()
     #print("MINT done")
     #print(base::date())
     
@@ -427,7 +428,7 @@ for(idtest in allidtest){
     if(bot_method == "BASE"){
       samples_bot_method <- base_samples_bottom
       meanf_bot_method <- mean_bottom_idtest
-    }else if(bot_method == "BASE-MINT"){
+    }else if(bot_method == "BASE-MINTshrink"){
       samples_bot_method <- t(t(base_samples_bottom) + adj_bottom_MINTshrink)
       meanf_bot_method <- revisedMINTshrink_bottom_idtest
     }else if(bot_method == "BASE-MCOMB"){
@@ -483,19 +484,19 @@ for(idtest in allidtest){
     if(agg_method == "BASE"){
       samples_agg_method <- base_samples_agg
       meanf_agg_method <- mean_agg_idtest
-    }else if(agg_method == "NAIVEBU"){
+    }else if(agg_method == "INDEPBU"){
       samples_agg_method <- t(tcrossprod(Sagg, apply(base_samples_bottom, 2, sample)))
       meanf_agg_method <- (Sagg %*% mean_bottom_idtest)
     }else if(agg_method == "PERMBU"){
       samples_agg_method <- t(tcrossprod(Sagg, perm_samples_bottom))
       meanf_agg_method <- (Sagg %*% mean_bottom_idtest)
-    #}else if(agg_method == "NAIVEBU-MINT"){
-    #  samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU", agg_methods)]) + adj_agg_MINT)
-    }else if(agg_method == "PERMBU-MINT"){
+    #}else if(agg_method == "INDEPBU-MINT"){
+    #  samples_agg_method <- t(t(samples_agg[, , match("INDEPBU", agg_methods)]) + adj_agg_MINT)
+    }else if(agg_method == "PERMBU-MINTshrink"){
       samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_MINTshrink)
       meanf_agg_method <- (Sagg %*% revisedMINTshrink_bottom_idtest)
-    }else if(agg_method == "NAIVEBU-MINT"){
-      samples_agg_method <- t(t(samples_agg[, , match("NAIVEBU" , agg_methods)]) + adj_agg_MINTshrink)
+    }else if(agg_method == "INDEPBU-MINTshrink"){
+      samples_agg_method <- t(t(samples_agg[, , match("INDEPBU" , agg_methods)]) + adj_agg_MINTshrink)
       meanf_agg_method <- (Sagg %*% revisedMINTshrink_bottom_idtest)
     }else if(agg_method == "PERMBU-MCOMB"){
       samples_agg_method <- t(t(samples_agg[, , match("PERMBU" , agg_methods)]) + adj_agg_mcomb)
@@ -534,6 +535,9 @@ for(idtest in allidtest){
   #if(idjob %in% c(1, 2, 3, 4, 5)){
   #  list_samples_agg[[idtest]] <- samples_agg
   #}
+  if(idjob == 1){
+    list_samples_agg[[idtest]] <- samples_agg
+  }
   
   #stop("done")
   if(FALSE){
@@ -603,64 +607,10 @@ res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bott
 save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "list_mse_bot", "list_mse_agg", "list_wcrps_agg", "list_wcrps_bot", "avg_qscores_agg", "avg_qscores_bot"))
 
 
-if(FALSE){
-  if(idjob %in% c(1, 2, 3, 4, 5)){
+if(TRUE){
+  #if(idjob %in% c(1, 2, 3, 4, 5)){
+  if(idjob %in% c(1)){
     samples_job <- file.path(work.folder, "samples_agg", paste("samples_agg_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
     save(file = samples_job, list = c("list_samples_agg"))
   }
-}
-
-stop("FINISHED")
-
-
-
-##############################################
-if(FALSE){
-  # load data for all aggregates - obs_agg_idtest
-  # Compute quantile scores and save them
-  savepdf(file.path(results.folder, paste("CDFPLOT", sep = "") ))
-  par(mfrow = c(2, 2))
-  for(iagg in seq(n_agg)){
-    for(idtest in seq(4)){
-      MAT <- cbind(sort(list_results_agg_perm[[idtest]][, iagg]), 
-                   sort(list_results_agg_naive[[idtest]][, iagg]),
-                   sort(list_results_agg_base[[idtest]][, iagg]),
-                   list_obs_agg[[idtest]][iagg])
-    matplot(x = MAT, y = seq(1, M)/M, pch = 1, cex = .5)
-    #abline(v = list_obs_agg[[idtest]][1])
-    }
-  }
-  dev.off()
-}
-
-iagg <- 10
-v <- lapply(seq(393), function(idtest){
-  list_qscores_agg[[idtest]][, , iagg]
-})
-vv <- Reduce("+", v)/393
-matplot(x = seq(1, M)/M, y = vv, col = c("black", "red", "blue", "orange", "darkblue"))
-abline(v = 0.5)
-
-
-temp <- Reduce("+", list_qscores_agg[seq(300)])
-
-
-#list_qscores_agg[[idtest]] <- qscores
-
-#comparing with CRPS
-#res2 <- apply(qscores, c(2, 3), sum)/length(q_probs)
-
-par(mfrow = c(2, 2))
-for(iagg in c(1, 10)){
-  matplot(y = qscores[, , iagg], x = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "red", "blue", "orange", "darkblue"))
-  MAT <- cbind(sorted_samples_agg[, iagg,], obs_agg_idtest[iagg])
-  matplot(x = MAT, y = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "red", "blue", "orange", "darkblue"))
-}
-
-par(mfrow = c(2, 2))
-for(i in c(100)){
-  matplot(y = sum_overtest_qscores_bot[, , i], x = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "magenta"))
-  sorted_samples_bot <- apply(samples_bot, c(2, 3), sort)
-  MAT <- cbind(sorted_samples_bot[, i,], obs_bottom_idtest[i])
-  matplot(x = MAT, y = seq(1, M)/M, pch = 1, cex = .5, col = c("black", "magenta"))
 }

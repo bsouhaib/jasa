@@ -161,7 +161,7 @@ do.relative <- FALSE
 #####
 if(do.relative){
   r <- (meanf[seq(1, n_agg), ] - Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ])/meanf[seq(1, n_agg), ]
-  r <- (meanf[seq(1, n_agg), ] - Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ])/Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ]
+  #r <- (meanf[seq(1, n_agg), ] - Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ])/Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ]
 }else{
   r <- meanf[seq(1, n_agg), ] - Sagg %*% meanf[seq(n_agg + 1, n_agg + n_bottom), ]
 }
