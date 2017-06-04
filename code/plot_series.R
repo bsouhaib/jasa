@@ -59,6 +59,11 @@ my.ts.panel <- function(x, col = col, bg = bg, pch = pch, type = type,  vpos=48*
   lines(x, col = col, bg = bg, pch = pch, type = type, ...)
   #abline(v=vpos)
   }
-plot.ts(alldemand, panel=my.ts.panel,  nc = 1, axes = F, xlab = "Half-hour", xaxt = "n", main = "")
+plot.ts(alldemand, panel=my.ts.panel,  nc = 1, axes = F, xlab = "", xaxt = "n", main = "")
+abline(v = seq(1, 48 * 7, by = 48), lty = 3)
+
+v <- seq(24, 48 * 7, by = 48)
+axis(1, labels = abbr.dweek, at=v , tick = F)
+
 endpdf()
 # main = paste(node_nbkids[node_order[id]], " aggregated meters", sep = ""), 

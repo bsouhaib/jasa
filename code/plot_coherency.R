@@ -24,8 +24,8 @@ gplot_matrix <- function(X, my_title = ""){
   
   p <- ggplot(data = Zp, aes(x = Var1, y = Var2)) + 
     geom_tile(aes(fill = value), colour = "white") + 
-    scale_fill_gradient2(name = expression(log(abs(tilde(epsilon)))), low="darkblue", high="darkgreen", guide="colorbar")+
-    #scale_fill_gradient2(name = expression(log(abs(tilde(epsilon)))), low="white", high="black", guide="colorbar")+
+    #scale_fill_gradient2(name = expression(log(abs(tilde(epsilon)))), low="darkblue", high="darkgreen", guide="colorbar")+
+    scale_fill_gradient2(name = "", low="white", high="black", guide="colorbar")+
     scale_x_continuous(breaks = mybreaks, labels = mylabels) +
     xlab("Hour of the day") + 
     ylab("Aggregate series") +
@@ -167,12 +167,10 @@ if(do.relative){
 }
 
 #r <- r[rank, ]
-r <- r[node_order, ]
-
-
+#r <- r[node_order, ]
 #X <- log(abs(r[, seq(48)]))
 
-v <- sapply(seq(n_agg), function(iagg){
+v <- sapply(node_order, function(iagg){
   #log(abs(matrix(r[iagg, ], ncol = 48, byrow = T)))
   #abs(matrix(r[iagg, ], ncol = 48, byrow = T))
   matrix(r[iagg, ], ncol = 48, byrow = T)
@@ -189,8 +187,31 @@ if(do.relative){
 }
 
 
+#########
+itday <- c(1, seq(12, 48, by = 12))
+id <- c(1, 7, 39, 50)
+
+savepdf(file.path(results.folder, paste("mean-coherency", sep = "") ))
+par(mfrow = c(2, 2))
+for(iagg in node_order[id]){
+  ind <- which(Sagg[iagg, ] == 1)
+  boxplot(v[, , iagg], xaxt = "n", main = paste(length(ind), " aggregated meters" , sep = ""), ylab = "Coherency errors", xlab = "Time of day")
+  axis(1, labels = tday[itday], at = itday, cex = .8)
+  abline(h = 0)
+}
+endpdf()
+#########
+
+
+
 savepdf(file.path(results.folder, paste("mean-coherency", sep = "") ))
 print(gplot_matrix(X))
+endpdf()
+
+
+MAT <- log(1 + abs(X))
+savepdf(file.path(results.folder, paste("mean-coherency", sep = "") ))
+print(gplot_matrix(MAT))
 endpdf()
 #####
 
@@ -200,6 +221,8 @@ p2 <- gplot_matrix(log(prob_coherency_10[rank, ]))
 p3 <- gplot_matrix(log(prob_coherency_50[rank, ]))
 p4 <- gplot_matrix(log(prob_coherency_90[rank, ]))
 multiplot(p1, p2, p3, p4, cols=2)
+
+
 
 
 

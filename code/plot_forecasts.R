@@ -7,9 +7,47 @@ source("utils.R")
 
 load(file.path(work.folder, "myinfo.Rdata"))
 
+#plot.permsamples <- FALSE
 plot.permsamples <- FALSE
-#plot.permsamples <- TRUE
+do.jasa <- TRUE
+
 if(plot.permsamples){
+  
+  do.agg <- T
+  algo.agg <- "DETS"
+  algo.bottom  <- "KD-IC-NML"
+  
+  alliseries <- c(1)
+  #alliseries <- sort(apply(Sagg, 1, sum), index = T, decreasing = T)$ix
+  idays <- seq(1, 2, by = 1)
+  idays <- 1
+  algorithms <- c("INDEPBU", "PERMBU", "MINTshrink", "INDEPBU-MINTshrink", "PERMBU-MINTshrink", "BASE")
+  agg_methods <- c("BASE", "INDEPBU", "PERMBU", "PERMBU-MINTshrink", "INDEPBU-MINTshrink", "MINTdiag", "MINTshrink")
+  
+  nbperjob <- 368
+  
+  QF_agg <- array(NA, c(M, length(algorithms), 48*2))
+  allidtest <- seq(1, 48*2)
+  idjob <- 1
+  samples_job <- file.path(work.folder, "samples_agg", paste("samples_agg_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
+  load(samples_job)
+  
+  list_samples_agg_nonull <- list_samples_agg[-which(sapply(list_samples_agg, is.null))]
+  BIGARRAY <- sapply(seq_along(list_samples_agg_nonull),  function(i){list_samples_agg_nonull[[i]]}, simplify = 'array')
+  QF_agg[, , allidtest] <- BIGARRAY[, alliseries, match(algorithms, agg_methods), ]
+  
+  mf_agg <- apply(QF_agg, c(2, 3), mean)
+  qf_agg <- apply(QF_agg, c(2, 3), quantile, prob = taus)
+  all_qf <- lapply(idays, function(iday){
+    qf_agg[, , (iday - 1) * 48 + seq(48) ]
+  })
+  all_mf <- lapply(idays, function(iday){
+    mf_agg[, (iday - 1) * 48 + seq(48) ]
+  })
+  
+  #stop("done")
+  
+}else if(FALSE){
   do.agg <- T
   alliseries <- c(1)
   idays <- seq(1, 7, by = 1)
@@ -57,25 +95,25 @@ if(plot.permsamples){
 
   idays <- seq(1, 92, by = 1)
   
-  do.jasa <- TRUE
+  
   if(do.jasa){
     alliseries <- c(1, 1453)
+    #alliseries <- c(1, 511)
     series_isagg <- c(TRUE, FALSE)
     idays <- c(10)
   }
 }
-
-tag <- "example"
-#tag <- alliseries;
 
 only.future <- FALSE
 
 
 
 if(do.jasa){
+  tag <- "example"
   savepdf(file.path(results.folder, paste("PLOT_forecasts_", tag, sep = "")), height = 27 * 0.25, width = 21)
   par(mfrow = c(1, 2))
 }else{
+  tag <- "allmethods"
   savepdf(file.path(results.folder, paste("PLOT_forecasts_", tag, sep = "") ))
 }
 
@@ -117,6 +155,7 @@ for(iseries in alliseries){
       
       nb_children <- "?"
       
+      #mymain <- paste(y, " - ", idseries, " (", nb_children, ")", sep = "")
       mymain <- paste(y, " - ", idseries, " (", nb_children, ")", sep = "")
       
       plot.ts(dat, main = mymain, ylim = setlim, xlab = "", ylab = "Demand (kW)", type = "n", xaxt = "n", xlim = y + c(0.035,.965))
@@ -128,7 +167,8 @@ for(iseries in alliseries){
   }
   
   if(!do.jasa){
-    par(mfrow = c(2, 2))
+    #par(mfrow = c(2, 2))
+    par(mfrow = c(2, 3))
   }
   
   list_load <- vector("list", length(algorithms))
@@ -206,21 +246,31 @@ for(iseries in alliseries){
       subtaus    <- c("5%", "25%", "75%", "95%")
       #subtaus    <- c("1%", "25%", "75%", "99%")
       
-      mymain <- paste(algo, " - ", 
-                        seq_testing_interval[(iday - 1) * 48 + 1], " - ",
-                        abbr.dweek[calendar$dweek[test$id[1] + (iday - 1) * 48]],
-                        sep = "")
-        
+      #mymain <- paste(algo, " - ", 
+      #                  seq_testing_interval[(iday - 1) * 48 + 1], " - ",
+      #                  abbr.dweek[calendar$dweek[test$id[1] + (iday - 1) * 48]],
+      #                  sep = "")
+      #mymain <- ifelse(algo == "KD-IC-NML", "KDE", ifelse(algo == "DETS", "HWT-ETS", algo))
+      mymain <- ""
+      
       #myYLIM <- c(0, max(c(future, qf_allhours[subtaus, ]), na.rm = T))	
         myYLIM <- c(day_min, day_max)
         
         plotQF(qf_allhours, future, subtaus, id = seq(48), only.future = only.future,
-               main = mymain, xlab = "Time", ylab = "Electricity demand (kWh)", xaxt='n', cex.lab = 1.2, ylim = myYLIM)
-        axis(1, labels = tday, at = seq(1, 48))
+               main = mymain, xlab = "Time of day", ylab = "Consumption (kWh)", xaxt='n', cex.lab = 1.2, ylim = myYLIM)
+        
+        #axis(1, labels = tday, at = seq(1, 48))
+        itday <- c(1, seq(8, 48, by = 8))
+        axis(1, labels = tday[itday], at = itday, cex.axis=0.9)
+        
         lines(mu_hat[iday, ], col = "red")
 
     }# ALGO
     
+    #if(!do.jasa){
+      #plot.new()
+      #plot.new()
+    #}
   }# DAY
   
   #dev.off()

@@ -99,10 +99,10 @@ for(iseries in seq(n_agg)){
 
 do.color <- TRUE
 if(do.color){
-  savepdf(file.path(results.folder, paste("IC_COLOR", sep = "")))
-  par(mfrow = c(2, 3))
-  my_cex <- .7
-  my_pch <- NULL
+  savepdf(file.path(results.folder, paste("IC_COLOR", sep = "")), height = 27 * 0.46)
+  par(mfrow = c(3, 2))
+  my_cex <- 1
+  my_pch <- c(3, 4, 5, 6, 7, 1, 2)
   mycol <- c("brown", "grey", "green", "yellow", "black", "blue", "red")
 }else{
   savepdf(file.path(results.folder, paste("IC_BLACK", sep = "")), height = 27 * 0.5)
@@ -125,27 +125,40 @@ for(iagg in node_order[id]){
   v <- MAT_agg[iagg, , ]
   #v <- apply(x, c(2, 3), mean)
   # matplot(v, type = 'l', lty = my_lty, ylab = "Electricity demand", main = length(ind), xaxt = "n", xlab = "Time of Day", col = "black")
-  matplot(v, ylab = "Consumption (kWh)", main = paste(length(ind), " aggregated meters" , sep = ""), xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
-  if(is.null(my_pch)){
-    matlines(v, col = mycol, cex = my_cex, lty = 1)
-  }else{
-    matpoints(v, pch = my_pch, col = mycol, cex = my_cex)
-  }
+  
+  #matplot(v, ylab = "Consumption (kWh)", main = paste(length(ind), " aggregated meters" , sep = ""), xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
+  #if(is.null(my_pch)){
+  #  matlines(v, col = mycol, cex = my_cex, lty = 1)
+  #}else{
+  #  matpoints(v, pch = my_pch, col = mycol, cex = my_cex)
+  #}
+  matplot(v, 
+          ylab = "Consumption (kWh)", main = paste(length(ind), " aggregated meters" , sep = ""), 
+          xaxt = "n", xlab = "Time of Day",
+          type = 'o', pch = my_pch, col = mycol, cex = my_cex)
+  
+  
   #axis(1, labels = tday[seq(1, 48, by = 8)], at = seq(1, 48, by = 8))
   axis(1, labels = tday[itday], at = itday)
   if(iagg == 1){
-    if(is.null(my_pch)){
-      legend("topleft", abbr.dweek[c(6, 7, 1, 2, 3, 4, 5)], 
-             col = mycol[c(6, 7, 1, 2, 3, 4, 5)], lty = 1, cex = my_cex, bty = "n", lwd = 2)
-    }else{
-      legend("topleft", abbr.dweek[c(6, 7, 1, 2, 3, 4, 5)], 
-             pch = my_pch[c(6, 7, 1, 2, 3, 4, 5)], lty = 1, cex = my_cex, bty = "n")
-    }
+    
+    #if(is.null(my_pch)){
+    #  legend("topleft", abbr.dweek[c(6, 7, 1, 2, 3, 4, 5)], 
+    #         col = mycol[c(6, 7, 1, 2, 3, 4, 5)], lty = 1, cex = my_cex, bty = "n", lwd = 2)
+    #}else{
+    #  legend("topleft", abbr.dweek[c(6, 7, 1, 2, 3, 4, 5)], 
+    #         pch = my_pch[c(6, 7, 1, 2, 3, 4, 5)], lty = 1, cex = my_cex, bty = "n")
+    #}
+    
+    legend("topleft", abbr.dweek[c(6, 7, 1, 2, 3, 4, 5)], 
+           pch = my_pch[c(6, 7, 1, 2, 3, 4, 5)], col = mycol[c(6, 7, 1, 2, 3, 4, 5)],
+           lty = 1, cex = my_cex, bty = "n")
+    
   }
 }
 
-#matplot(MAT[50, , ], type = 'l', lty = my_lty, ylab = "Electricity demand (scaled)", main = 1, xaxt = "n", xlab = "Time of Day", col = "black")
-matplot(MAT_bottom[50, , ], ylab = "Electricity demand", main = "Individual smart meter", xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
+#matplot(MAT[50, , ], type = 'l', lty = my_lty, ylab = "Consumption (kWh)", main = 1, xaxt = "n", xlab = "Time of Day", col = "black")
+matplot(MAT_bottom[50, , ], ylab = "Consumption (kWh)", main = "Individual smart meter", xaxt = "n", xlab = "Time of Day", col = "black", type = 'l')
 if(is.null(my_pch)){
   matlines(MAT_bottom[50, , ], lty = 1, col = mycol, cex = my_cex)
 }else{

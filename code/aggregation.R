@@ -2,7 +2,7 @@ rm(list = ls())
 args = (commandArgs(TRUE))
 if(length(args) == 0){
   idjob <- 1
-  allidtest <- 1:4 #1:123 #1:4 #1:1104 
+  allidtest <- seq(48*2) #1:123 #1:4 #1:1104 
 }else{
   
   #for(i in 1:length(args)){
@@ -535,9 +535,16 @@ for(idtest in allidtest){
   #if(idjob %in% c(1, 2, 3, 4, 5)){
   #  list_samples_agg[[idtest]] <- samples_agg
   #}
-  if(idjob == 1){
-    list_samples_agg[[idtest]] <- samples_agg
-  }
+  
+  #if(idjob == 1){
+  #  list_samples_agg[[idtest]] <- samples_agg
+  #  
+  #  if(idtest == 48*2){
+  #    samples_job <- file.path(work.folder, "samples_agg", paste("samples_agg_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
+  #    save(file = samples_job, list = c("list_samples_agg"))
+  #    
+  #  }
+  #}
   
   #stop("done")
   if(FALSE){
@@ -607,7 +614,7 @@ res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bott
 save(file = res_job, list = c("list_crps_agg", "list_crps_bot", "list_mse_bot", "list_mse_agg", "list_wcrps_agg", "list_wcrps_bot", "avg_qscores_agg", "avg_qscores_bot"))
 
 
-if(TRUE){
+if(FALSE){
   #if(idjob %in% c(1, 2, 3, 4, 5)){
   if(idjob %in% c(1)){
     samples_job <- file.path(work.folder, "samples_agg", paste("samples_agg_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 

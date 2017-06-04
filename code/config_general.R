@@ -36,6 +36,8 @@ m_2 <- 336
 algo.agg <- "DETS"
 algo.bottom <- "KD-IC-NML"
 
+min_bandwith <- 10^-6
+
 print("----")
 print(algo.agg)
 print(algo.bottom)

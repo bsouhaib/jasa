@@ -33,7 +33,8 @@ plot(g, layout = layout.reingold.tilford(g, root=1, circular=T), vertex.size=myv
 endpdf()
 
 #myvsize <- apply(Sagg, 1, sum)/60
-res <- getInfoNode("kwh")
+#res <- getInfoNode("kwh")
+res <- getInfoNode("nb_nodes")
 newg <- delete_vertices(g, seq(56, length(V(g))))
 V(newg)$color <- "white"
 
@@ -45,6 +46,12 @@ endpdf()
 myvsize <- sqrt(res$info_nodes_agg)
 savepdf(file.path(results.folder, paste("hierarchy-plot-sqrtsize", sep = "") ))
 plot(newg, layout = layout.reingold.tilford(newg, root=1), vertex.size = myvsize, vertex.label= NA, edge.arrow.size=0)
+endpdf()
+
+
+myvsize <- res$info_nodes_agg/20
+savepdf(file.path(results.folder, paste("hierarchy-plot-size", sep = "") ) )
+plot(newg, layout = layout_as_tree(newg, root=1), vertex.size = myvsize, vertex.label= NA, edge.arrow.size=0)
 endpdf()
 
 #myvsize <- res$info_nodes_agg/20

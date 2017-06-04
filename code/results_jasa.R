@@ -7,8 +7,16 @@ do.colors <- TRUE
  
 better_names <- function(x){
   if(measure == "MSE"){
-    x[which(x == "NAIVEBU")] <- "BU"
+    x[which(x == "NAIVEBU")] <- "IBU/PBU"
+  }else if(measure == "CRPS" || measure == "CRPS Tails"){
+    x[which(x == "NAIVEBU")] <- "IBU"
+    x[which(x == "PERMBU")] <- "PBU"
+    x[which(x == "NAIVEBU-MINT")] <- "IBU-CombShrink"
+    x[which(x == "PERMBU-MINT")]  <- "PBU-CombShrink"
   }
+  x[which(x == "MINTdiag")] <- "CombDiag"
+  x[which(x == "MINTshrink")] <- "CombShrink"
+  
   return(x)
 }
 
@@ -44,8 +52,16 @@ for(measure in measures){
     }   
     
     filename <- paste("RESULTS_JASA_", gsub(" ", "", measure, fixed = TRUE), "_", id, "_", ifelse(do.colors, "COLOR", "BLACK"), sep = "")
+   
     savepdf(file.path(results.folder, filename))
+    #pdf(file.path(results.folder, filename), width = 7, height = 3.5)
+    #filename <- paste(filename, ".pdf", sep = "")
+    
     par(mfrow = c(2, 3))
+    #par(mfrow = c(2, 3), mai = c(0.2, 0.2, 0.1, 0.1))
+    
+    # mai = c(1, 0.1, 0.1, 0.1) c(bottom, left, right, top)
+    
     #par(mfrow = c(2, 4))
     #par(mfrow = c(4, 6))
     
@@ -96,14 +112,17 @@ for(measure in measures){
           interval <- seq(cum_vec[i - 1] + 1, cum_vec[i])
         }
         y_mat <- rbind(y_mat, apply(res_agg[agg_nodes_order[interval], id_wanted_agg, drop = F], 2, mean) )
-        x_vec <- c(x_vec, log(1 + mean(res_info$info_nodes_agg[agg_nodes_order[interval]])) )
+        x_vec <- c(x_vec, log10(mean(res_info$info_nodes_agg[agg_nodes_order[interval]])) )
       }
       
-      matplot(x = c(x_vec, x_vec_bot), y = rbind(y_mat, y_mat_bot),
+      matplot(x = c(x_vec, x_vec_bot), y = rbind(y_mat, y_mat_bot) * 100,
               type = 'o', pch = pch.agg[id_wanted_agg],  lty = 1, col = mycolors, #col = color.agg[id_wanted_agg],
-              xlab = "Number of aggregated meters (log scale)", ylab = paste(measure, " skill", sep = ""), main = maink)
+              # xlab = "Log_10(number of aggregated meters)", 
+              xlab = expression(Log[10]("number of aggregated meters")), 
+              ylab = paste(measure, " skill (%)", sep = ""), main = maink)
       if(k == 1){
-        legend("bottomleft", better_names(agg_methods[id_wanted_agg]), lty = 1, pch = pch.agg[id_wanted_agg], col = mycolors, cex = .8)
+        legend("bottomleft", better_names(agg_methods[id_wanted_agg])[-1], 
+               lty = 1, pch = pch.agg[id_wanted_agg][-1], col = mycolors[-1], cex = 1.1)
       }	
       
     } # k 

@@ -7,10 +7,15 @@ if(length(args) == 0){
   #algo <- c("KD-IC-NML")
   #algo <- c("TBATS")
   #algo <- "DYNREG"
-  algo <- "DETS"
-    
-  do.agg <- T
-  alliseries <- c(1)
+  
+  #do.agg <- T
+  #algo <- "DETS"
+  
+  do.agg <- F
+  algo <- c("KD-IC-NML")
+  
+  alliseries <- c(1, 20, 100)
+  alliseries <- 1
 }else{
   
   for(i in 1:length(args)){
@@ -47,6 +52,7 @@ stopifnot(algo %in% algos_allowed)
 
 for(iseries in alliseries){
 
+  print(base::date())
   print(iseries)
   if(do.agg){
     idseries <- aggSeries[iseries]
@@ -416,6 +422,7 @@ for(iseries in alliseries){
     
     ### LEARNING
     res_learning <- predictkde("learning")
+    
     #stop("done")
     
     #results_crps <- sapply(res_learning$results, function(list_vectors){
@@ -433,6 +440,7 @@ for(iseries in alliseries){
     #}
     #selected_bandwiths_ic <- res_learning$bandwiths[idbest_bandwiths]
     
+    #browser()
     results_crps <- sapply(res_learning$results, function(list_vectors){
         sapply(list_vectors, function(list_two){
           sapply(list_two, function(vector){
@@ -446,7 +454,7 @@ for(iseries in alliseries){
     
     idbest_bandwiths <- idbest_lambda <- NULL
     for(ic in seq(3)){
-      err <- apply(results_crps[, , , which(ic_days == ic)], c(1, 3), median)
+      err <- apply(results_crps[, , , which(ic_days == ic)], c(1, 3), mean)
       idbest <- which(err == min(err), arr.ind = T)
       #print(err)
       #print(idbest)
@@ -455,6 +463,12 @@ for(iseries in alliseries){
     }
     selected_bandwiths_ic <- res_learning$bandwiths[idbest_bandwiths]
     selected_lambdas_ic <- res_learning$lambdas[idbest_lambda]
+    
+    #stop("done")
+    
+    param_file <- file.path(basef.folder, algo, paste("parameters_", idseries, "_", algo, ".Rdata", sep = "")) 
+    save(file = param_file, 
+         list = c("selected_bandwiths_ic", "selected_lambdas_ic", bandwiths = res_learning$lambdas))
     
     # boxplot(apply(results_crps[, , which(ic_days == ic)], 1, identity), outline = F)
     
