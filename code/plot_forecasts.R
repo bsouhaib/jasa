@@ -88,19 +88,23 @@ if(plot.permsamples){
   
 }else{
   do.agg <- F
-  alliseries <- c(1267)
+  alliseries <- seq(200) #c(1267)
   #algorithms <- c("DYNREG")
-  #algorithms <- c("KD-IC-NML")
+  algorithms <- c("KD-IC-NML")
   #algorithms <- c("DETS")
 
   idays <- seq(1, 92, by = 1)
+  idays <- 1
   
   
   if(do.jasa){
     alliseries <- c(1, 1453)
-    #alliseries <- c(1, 511)
+    
+    alliseries <- c(1, 34)
+    alliseries <- c(1, 50)
+    
     series_isagg <- c(TRUE, FALSE)
-    idays <- c(10)
+    idays <- c(1)
   }
 }
 
@@ -251,7 +255,7 @@ for(iseries in alliseries){
       #                  abbr.dweek[calendar$dweek[test$id[1] + (iday - 1) * 48]],
       #                  sep = "")
       #mymain <- ifelse(algo == "KD-IC-NML", "KDE", ifelse(algo == "DETS", "HWT-ETS", algo))
-      mymain <- ""
+      mymain <- ifelse(algo == "KD-IC-NML", "Individual smart meter", ifelse(algo == "DETS", "Top aggregated series", algo))
       
       #myYLIM <- c(0, max(c(future, qf_allhours[subtaus, ]), na.rm = T))	
         myYLIM <- c(day_min, day_max)

@@ -7,15 +7,15 @@ do.colors <- TRUE
 
 better_names <- function(x){
   if(measure == "MSE"){
-    x[which(x == "NAIVEBU")] <- "IBU and PBU"
+    x[which(x == "NAIVEBU")] <- "IndepBU and DepBU"
   }else if(measure == "CRPS" || measure == "CRPS Tails"){
-    x[which(x == "NAIVEBU")] <- "IBU"
-    x[which(x == "PERMBU")] <- "PBU"
-    x[which(x == "NAIVEBU-MINT")] <- "IBU-CombShrink"
-    x[which(x == "PERMBU-MINT")]  <- "PBU-CombShrink"
+    x[which(x == "NAIVEBU")] <- "IndepBU"
+    x[which(x == "PERMBU")] <- "DepBU"
+    x[which(x == "NAIVEBU-MINT")] <- "IndepBU-MinTShrink"
+    x[which(x == "PERMBU-MINT")]  <- "DepBU-MinTShrink"
   }
-  x[which(x == "MINTdiag")] <- "CombDiag"
-  x[which(x == "MINTshrink")] <- "CombShrink"
+  x[which(x == "MINTdiag")] <- "MinTDiag"
+  x[which(x == "MINTshrink")] <- "MinTShrink"
   
   return(x)
 }
@@ -77,7 +77,7 @@ for(measure in measures){
     results_agg_avg <- apply(results_agg, c(2, 3), function(x){ tapply(x, myfactor_hours, mean) })
     results_agg_avg <- apply(results_agg_avg, c(1, 2), function(x){ tapply(x, myfactor_series_agg, mean) })
     results_agg_avg <- aperm(results_agg_avg, c(2, 3, 1))
-    x_nbagg <- tapply(res_info$info_nodes_agg[node_order], myfactor_series, mean)
+    x_nbagg <- tapply(res_info$info_nodes_agg[node_order], myfactor_series_agg, mean)
     
     
     for(k in seq( length(grouping_hours) ) ){
