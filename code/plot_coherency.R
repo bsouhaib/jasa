@@ -108,6 +108,8 @@ meanres <- lapply(allres, function(mat){
 stop("done")
 
 
+
+
 listp <- vector("list", 8)
 
 for(p in seq(8)){
@@ -175,24 +177,16 @@ v <- sapply(node_order, function(iagg){
   #abs(matrix(r[iagg, ], ncol = 48, byrow = T))
   matrix(r[iagg, ], ncol = 48, byrow = T)
 }, simplify = "array")
-v <- aperm(v, c(1, 3, 2))
-
-X <- apply(v, c(2, 3), mean)
-
-
-if(do.relative){
-  #X <- abs(X)
-}else{
-  X <- log(abs(X))
-}
 
 
 #########
 itday <- c(1, seq(12, 48, by = 12))
 id <- c(1, 7, 39, 50)
+id <- c(1, 7)
 
 savepdf(file.path(results.folder, paste("mean-coherency", sep = "") ))
-par(mfrow = c(2, 2))
+#par(mfrow = c(2, 2))
+par(mfrow = c(1, 2))
 for(iagg in node_order[id]){
   ind <- which(Sagg[iagg, ] == 1)
   boxplot(v[, , iagg], xaxt = "n", main = paste(length(ind), " aggregated meters" , sep = ""), ylab = "Coherency errors", xlab = "Time of day")
@@ -201,6 +195,16 @@ for(iagg in node_order[id]){
 }
 endpdf()
 #########
+
+v <- aperm(v, c(1, 3, 2))
+X <- apply(v, c(2, 3), mean)
+
+
+if(do.relative){
+  #X <- abs(X)
+}else{
+  X <- log(abs(X))
+}
 
 
 

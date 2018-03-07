@@ -32,17 +32,9 @@ if(do.twentyfour){
 #nbperjob <- 138
 #njobs <- 32
 
-do.icml <- TRUE
 
 nbperjob <- 368
 njobs <- 12
-
-if(do.icml){
-  algo.agg <- "DYNREG"
-  algo.bottom <- "KD-IC-NML"
-  nbperjob <- 123
-  njobs <- 36
-}
 
 leaves <- V(itree)[degree(itree, mode="out") == 0]
 agg_nodes <- V(itree)[degree(itree, mode="out") != 0]
@@ -97,7 +89,7 @@ color.agg <- c("black", "orange", "cyan", "purple", "darkgreen", "darkblue", "re
 agg_better_names <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2", "PERMBU-COMB")
 bot_better_names <- c("BASE", "PERMBU-MINT", "PERMBU-GTOP1", "PERMBU-GTOP2")
 }
-if(do.icml){
+if(FALSE){
   bot_methods <- c("BASE", "BASE-MINT", "BASE-MCOMB", "BASE-MCOMBRECON")
   color.bot <- c("black", "purple", "darkgreen", "darkblue")
   agg_methods <- c("BASE", "NAIVEBU", "PERMBU", "PERMBU-MINT", "PERMBU-MCOMB", 
@@ -130,13 +122,8 @@ for(idjob in seq(njobs)){
     #allidtest <- 4291:4416
   }
   
-  if(do.icml){
-    res_job <- file.path(loss.folder, "LOSSICML", paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
-    load(res_job)
-  }else{
     res_job <- file.path(loss.folder, paste("results_HTS_", algo.agg, "_", algo.bottom, "_", idjob, ".Rdata", sep = "")) 
     load(res_job)
-  }
   
   # crps agg
   list_crps_agg_nonull <- list_crps_agg[-which(sapply(list_crps_agg, is.null))]
