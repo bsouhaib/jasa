@@ -98,13 +98,16 @@ if(plot.permsamples){
   
   
   if(do.jasa){
-    alliseries <- c(1, 1453)
+    series_isagg <- c(TRUE, FALSE) # actual
+    alliseries <- c(1, 34) # actual
+    idays <- c(1) # actual
+    idays <- c(11) # bettter coverage
     
-    alliseries <- c(1, 34)
-    alliseries <- c(1, 50)
-    
-    series_isagg <- c(TRUE, FALSE)
-    idays <- c(1)
+    #alliseries <- c(1, 1453)
+    #alliseries <- c(1, 50)
+    #idays <- c(90)
+    # for agg: 3
+    # for bottom: 35, 75, 
   }
 }
 
@@ -259,6 +262,18 @@ for(iseries in alliseries){
       
       #myYLIM <- c(0, max(c(future, qf_allhours[subtaus, ]), na.rm = T))	
         myYLIM <- c(day_min, day_max)
+        
+        # COVERAGE
+        
+        # qf_allhours["75%", ]
+        # qf_allhours["25%", ]
+        # future > qf_allhours["25%", ] & future < qf_allhours["75%", ]
+        
+        cov50 <- 100 * length(which(future >= qf_allhours["25%", ] & future <= qf_allhours["75%", ]))/48
+        cov90 <- 100 * length(which(future >= qf_allhours["5%", ] & future <= qf_allhours["95%", ]))/48
+        print(paste("50%: ", cov50), sep = "")
+        print(paste("90%: ", cov90), sep = "")
+        #browser()
         
         plotQF(qf_allhours, future, subtaus, id = seq(48), only.future = only.future,
                main = mymain, xlab = "Time of day", ylab = "Consumption (kWh)", xaxt='n', cex.lab = 1.2, ylim = myYLIM)

@@ -247,6 +247,16 @@ kde <- function(id_query, ids_data, bandwiths, lambda, task){
     })
     cdf <- rowSums(cdfs)
     
+    if(task == "insample_info"){
+     
+      mycdf <- function(xq){
+        sum(sapply(seq(length(x)), function(i){ 	
+          xi <- x[i]
+          pnorm((xq - xi)/vech[i]) * normalized_weights[i]
+        }))
+      }
+    }
+    
     
     #plot(xgrid, cdf)
     #rug(x)
@@ -275,6 +285,10 @@ kde <- function(id_query, ids_data, bandwiths, lambda, task){
     obs <- demand[id_query]
     
     
+    if(task == "insample_info"){
+      upit <- mycdf(obs)
+      #upit <- ecdf(x)(obs)
+    }
     
     residuals[i] <- obs - mu_hat[i] 
     squared_error[i] <- (residuals[i])^2 
@@ -315,7 +329,7 @@ kde <- function(id_query, ids_data, bandwiths, lambda, task){
   }else if(task == "testing"){
     ret <- list(crps = vec_crps, squared_error = squared_error, q_hat = q_hat, mu_hat = mu_hat, var_hat = var_hat)
   }else if(task == "insample_info"){
-    ret <- list(residuals = residuals, q_hat = q_hat, mu_hat = mu_hat, var_hat = var_hat)
+    ret <- list(residuals = residuals, q_hat = q_hat, mu_hat = mu_hat, var_hat = var_hat, upit = upit)
   }else{
     stop("ERROR ...")
   }

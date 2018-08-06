@@ -44,7 +44,11 @@ for(i_xvar in seq_along(allinputSeries)){
     all_mu <- c(rep(NA, n_past_obs_kd), all_mu)
   }
   Xhat_learn[, i_xvar] <-  all_mu
-  
+
+if(algo == "KD-IC-NML"){ 
+	stop("done")
+}
+ 
   #
   res_file <- file.path(basef.folder, algo, paste("results_", xvar_series, "_", algo, ".Rdata", sep = "")) 
   load(res_file) # all_mf

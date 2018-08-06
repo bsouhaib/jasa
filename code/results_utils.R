@@ -17,6 +17,9 @@ get_mat <- function(measure, do.skill){
   }else if(measure == "MSE"){
     res_agg <- mse_agg_byhour
     res_bot <- mse_bot_byhour
+  }else if(measure == "RMSE"){
+    res_agg <- sqrt(mse_agg_byhour)
+    res_bot <- sqrt(mse_bot_byhour)
   }else if(measure == "QS"){
     res_agg <- total_qscores_agg
     res_bot <- total_qscores_bot
@@ -46,7 +49,8 @@ to_aggname <- function(algo){
   {
     res <- "BASE"
   }else if(algo %in% c("PERMBU-MINT", "NAIVEBU-MINT")){
-    res <- "MINTshrink"
+    # res <- "MINTshrink"
+    res <- "BASE-MINT"
   }else{
     res <- algo
   } 

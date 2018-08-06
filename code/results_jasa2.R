@@ -1,3 +1,5 @@
+# RUN aggregation_merge.R first
+
 shifter <- function(x, n = 1) {
   #if (n == 0) x else c(tail(x, -n), head(x, n))
   if (n == 0) x else c(tail(x, n), head(x, -n))
@@ -5,21 +7,24 @@ shifter <- function(x, n = 1) {
 source("results_utils.R")
 color.agg[match(c("PERMBU-MINT", "NAIVEBU-MINT"), agg_methods)] <- color.agg[match(c("PERMBU", "NAIVEBU"), agg_methods)]
 
-do.skill <- TRUE
+do.skill <- FALSE
 do.colors <- TRUE
 
 
 better_names <- function(x){
-  if(measure == "MSE"){
-    x[which(x == "NAIVEBU")] <- "IndepBU and DepBU"
+  if(measure == "MSE" || measure == "RMSE"){
+    x[which(x == "NAIVEBU")] <- "NoMinT" #"IndepBU and DepBU"
+    x[which(x == "MINTdiag")] <- "MinTDiag"
+    x[which(x == "MINTshrink")] <- "MinTShrink"
   }else if(measure == "CRPS" || measure == "CRPS Tails"){
     x[which(x == "NAIVEBU")] <- "IndepBU"
     x[which(x == "PERMBU")] <- "DepBU"
     x[which(x == "NAIVEBU-MINT")] <- "IndepBU-MinTShrink"
     x[which(x == "PERMBU-MINT")]  <- "DepBU-MinTShrink"
+    
+    x[which(x == "MINTdiag")] <- "LogN-MinTDiag"
+    x[which(x == "MINTshrink")] <- "logN-MinTShrink"
   }
-  x[which(x == "MINTdiag")] <- "MinTDiag"
-  x[which(x == "MINTshrink")] <- "MinTShrink"
   
   return(x)
 }
@@ -45,14 +50,15 @@ myfactor_series_agg <- rep(seq(length( grouping_series_agg )), times = grouping_
 grouping_series_bot <- 526*3
 myfactor_series_bot <- rep(seq(length( grouping_series_bot )), times = grouping_series_bot)
 
-measures <- c("CRPS", "CRPS Tails", "MSE")
+measures <- c("CRPS", "CRPS Tails", "MSE", "RMSE")
 for(measure in measures){
   print(measure)
-  list_mat <- get_mat(measure, do.skill = FALSE)
+  list_mat <- get_mat(measure, do.skill = FALSE) ##########################
+  #browser()
   
-  for(id in 1:2){
-    if(measure == "MSE"){
-      if(id == 1){
+  for(mystep in 1:2){
+    if(measure == "MSE" || measure == "RMSE"){
+      if(mystep == 1){
         #algos <- c("BASE", "NAIVEBU")
         algos <- c("NAIVEBU")
       }else{
@@ -60,7 +66,7 @@ for(measure in measures){
         algos <- c("NAIVEBU", "MINTdiag", "MINTshrink")
       }	
     }else{
-      if(id == 1){
+      if(mystep == 1){
         #algos <- c("BASE", "NAIVEBU", "PERMBU")
         algos <- c("NAIVEBU", "PERMBU")
       }else{
@@ -76,7 +82,8 @@ for(measure in measures){
       mycolors <- "black"
     }   
     
-    filename <- paste("RESULTS_JASA_", gsub(" ", "", measure, fixed = TRUE), "_", id, "_", ifelse(do.colors, "COLOR", "BLACK"), sep = "")
+    filename <- paste("_REVIEW_RESULTS_JASA_", gsub(" ", "", measure, fixed = TRUE), "_", mystep, "_", 
+                      ifelse(do.colors, "COLOR", "BLACK"), "_", ifelse(do.skill, "SKILL", "ABSOLUTE"), sep = "")
     
     savepdf(file.path(results.folder, filename), height = 5)
     #pdf(file.path(results.folder, filename), width = 7, height = 3.5)
@@ -104,7 +111,7 @@ for(measure in measures){
     
     for(k in seq( length(grouping_hours) ) ){
       my_ylim <- NULL
-      if(measure == "MSE" && k <= 3){
+      if( (measure == "MSE" || measure == "RMSE") && k <= 3){
         my_ylim <- mse_ylim[[k]]
       }
 
@@ -115,13 +122,30 @@ for(measure in measures){
       }
       maink <- paste(tday[c(head(id, 1), tail(id, 1))], collapse = " - ")
       
+      #browser()
+      
       i_base <- match("BASE", bot_methods)
-      u_bot <- t( (results_bot_avg[k, i_base] - t(results_bot_avg[k, id_wanted_bot]))/results_bot_avg[k, i_base])
-      u_bot <- t(u_bot) * 100
+      if(do.skill){
+        u_bot <- t( (results_bot_avg[k, i_base] - t(results_bot_avg[k, id_wanted_bot]))/results_bot_avg[k, i_base])
+        u_bot <- t(u_bot) * 100
+      }else{
+        u_bot <- t(results_bot_avg[k, id_wanted_bot])
+      }
+      
+      #print(measure)
+      #print(mystep)
+      #print(k)
+      #print(u_bot)
+      #browser()
       
       i_base <- match("BASE", agg_methods)
-      u_agg <- t( (results_agg_avg[k, i_base, ] - t(results_agg_avg[k, id_wanted_agg, ]))/results_agg_avg[k, i_base, ])
-      u_agg <- t(u_agg) * 100
+      if(do.skill){
+        u_agg <- t( (results_agg_avg[k, i_base, ] - t(results_agg_avg[k, id_wanted_agg, ]))/results_agg_avg[k, i_base, ])
+        u_agg <- t(u_agg) * 100
+        
+      }else{
+        u_agg <- t(results_agg_avg[k, id_wanted_agg, ])
+      }
       
       if(length(id_wanted_agg) == 1)
         u_agg <- t(u_agg)
@@ -129,16 +153,39 @@ for(measure in measures){
       u_all <- rbind(u_agg, u_bot)
       x_all <- c(x_nbagg, x_nbbot)
       
-      matplot(log10(x_all), u_all, 
+      #if(mystep == 2)
+      #browser()
+      
+      if(do.skill){
+        matplot(log10(x_all), u_all, 
               type = 'o', pch = pch.agg[id_wanted_agg],  lty = 1, col = mycolors,
-              xlab = expression(Log[10]("number of aggregated meters")), 
+              xlab = "Number of aggregated meters", 
               ylab = paste(measure, " skill (%)", sep = ""), main = maink,
-              ylim = my_ylim)
-      abline(h = 0)
+              ylim = my_ylim, xaxt = "n")
+        abline(h = 0)
+      }else{
+        matplot(log10(x_all), u_all, 
+                type = 'o', pch = pch.agg[id_wanted_agg],  lty = 1, col = mycolors,
+                xlab = "Number of aggregated meters", 
+                ylab = paste(measure, ifelse(measure == "RMSE", " (kWh)", "") , sep = ""), main = maink, xaxt = "n")
+      }
+      
+      #axis(1, at = log10(x_all), labels = log(x_all))
+      x <- c(0,  1, 2, 3)
+      axis(1, at = x, labels = 10^x)
+      
       if(k == 1){
-        legend("bottomleft", better_names(agg_methods[id_wanted_agg]), 
-               lty = 1, pch = pch.agg[id_wanted_agg], col = mycolors, cex = 1.1)
+        myplace <- ifelse(measure == "RMSE" & !do.skill, "topleft", "bottomleft")
+        myinset <- c(0, 0)
+        if(measure == "CRPS"){
+          myinset <- c(0.1,0)
+        }
+        legend(myplace, better_names(agg_methods[id_wanted_agg]), 
+               lty = 1, pch = pch.agg[id_wanted_agg], col = mycolors, cex = 1.1, bty = "n",
+               inset = myinset)
       }	
+      
+      
       
     } # k 
     dev.off()

@@ -27,8 +27,11 @@ savepdf(file.path(results.folder, paste("hierarchy-plot", sep = "") ))
 #myvsize <- c(apply(Sagg, 1, sum), rep(0, ncol(Sagg)))
 #plot(g, layout = layout.reingold.tilford(g, root=1, circular=T), vertex.size=myvsize/90, edge.arrow.size=0, vertex.label.cex = .7)
 
-myvsize <- log(c(apply(Sagg, 1, sum), rep(1, ncol(Sagg))))
-plot(g, layout = layout.reingold.tilford(g, root=1, circular=T), vertex.size=myvsize, edge.arrow.size=0, vertex.label= NA)
+#myvsize <- log(c(apply(Sagg, 1, sum), rep(1, ncol(Sagg))))
+myvsize <- c(apply(Sagg, 1, sum), rep(1, ncol(Sagg)))/56
+
+plot(g, layout = layout.reingold.tilford(g, root=1, circular=T), 
+     vertex.size=myvsize, edge.arrow.size=0, vertex.label= NA, vertex.color = "white")
 
 endpdf()
 

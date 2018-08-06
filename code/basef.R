@@ -15,7 +15,7 @@ if(length(args) == 0){
   algo <- c("KD-IC-NML")
   
   alliseries <- c(1, 20, 100)
-  alliseries <- 1
+  alliseries <- 320
 }else{
   
   for(i in 1:length(args)){
@@ -68,7 +68,7 @@ for(iseries in alliseries){
   #}
   
   
-  
+  #stop("done")
   #for(algo in algorithms){
   
   print(algo)
@@ -467,8 +467,9 @@ for(iseries in alliseries){
     #stop("done")
     
     param_file <- file.path(basef.folder, algo, paste("parameters_", idseries, "_", algo, ".Rdata", sep = "")) 
+    bandwiths <- res_learning$lambdas
     save(file = param_file, 
-         list = c("selected_bandwiths_ic", "selected_lambdas_ic", bandwiths = res_learning$lambdas))
+         list = c("selected_bandwiths_ic", "selected_lambdas_ic", "bandwiths"))
     
     # boxplot(apply(results_crps[, , which(ic_days == ic)], 1, identity), outline = F)
     
