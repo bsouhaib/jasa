@@ -7,7 +7,7 @@ shifter <- function(x, n = 1) {
 source("results_utils.R")
 color.agg[match(c("PERMBU-MINT", "NAIVEBU-MINT"), agg_methods)] <- color.agg[match(c("PERMBU", "NAIVEBU"), agg_methods)]
 
-do.skill <- FALSE
+do.skill <- TRUE
 do.colors <- TRUE
 
 
@@ -23,7 +23,7 @@ better_names <- function(x){
     x[which(x == "PERMBU-MINT")]  <- "DepBU-MinTShrink"
     
     x[which(x == "MINTdiag")] <- "LogN-MinTDiag"
-    x[which(x == "MINTshrink")] <- "logN-MinTShrink"
+    x[which(x == "MINTshrink")] <- "LogN-MinTShrink"
   }
   
   return(x)
