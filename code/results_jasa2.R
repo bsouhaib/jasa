@@ -7,7 +7,7 @@ shifter <- function(x, n = 1) {
 source("results_utils.R")
 color.agg[match(c("PERMBU-MINT", "NAIVEBU-MINT"), agg_methods)] <- color.agg[match(c("PERMBU", "NAIVEBU"), agg_methods)]
 
-do.skill <- TRUE
+do.skill <- FALSE
 do.colors <- TRUE
 
 
@@ -56,7 +56,9 @@ for(measure in measures){
   list_mat <- get_mat(measure, do.skill = FALSE) ##########################
   #browser()
   
-  for(mystep in 1:2){
+  #mysteps <- 1:2
+  mysteps <- 2
+  for(mystep in mysteps){
     if(measure == "MSE" || measure == "RMSE"){
       if(mystep == 1){
         #algos <- c("BASE", "NAIVEBU")
@@ -161,13 +163,15 @@ for(measure in measures){
               type = 'o', pch = pch.agg[id_wanted_agg],  lty = 1, col = mycolors,
               xlab = "Number of aggregated meters", 
               ylab = paste(measure, " skill (%)", sep = ""), main = maink,
-              ylim = my_ylim, xaxt = "n")
+              ylim = my_ylim, xaxt = "n", 
+              cex = 1.2)
         abline(h = 0)
       }else{
         matplot(log10(x_all), u_all, 
                 type = 'o', pch = pch.agg[id_wanted_agg],  lty = 1, col = mycolors,
                 xlab = "Number of aggregated meters", 
-                ylab = paste(measure, ifelse(measure == "RMSE", " (kWh)", "") , sep = ""), main = maink, xaxt = "n")
+                ylab = paste(measure, ifelse(measure == "RMSE", " (kWh)", "") , sep = ""), main = maink, xaxt = "n", 
+                cex = 1.2)
       }
       
       #axis(1, at = log10(x_all), labels = log(x_all))

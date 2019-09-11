@@ -273,7 +273,7 @@ for(iseries in alliseries){
         cov90 <- 100 * length(which(future >= qf_allhours["5%", ] & future <= qf_allhours["95%", ]))/48
         print(paste("50%: ", cov50), sep = "")
         print(paste("90%: ", cov90), sep = "")
-        #browser()
+        
         
         plotQF(qf_allhours, future, subtaus, id = seq(48), only.future = only.future,
                main = mymain, xlab = "Time of day", ylab = "Consumption (kWh)", xaxt='n', cex.lab = 1.2, ylim = myYLIM)
